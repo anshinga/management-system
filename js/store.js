@@ -1,7 +1,10 @@
 const STORAGE_KEY = "mpm-attendance-prototype-v1";
 
 const seed = {
-  seasons: [{ id: "summer-2026", name: "2026 暑假", startDate: "2026-07-01", endDate: "2026-08-31", active: true }],
+  seasons: [
+    { id: "summer-2026", name: "2026 暑假", startDate: "2026-07-01", endDate: "2026-08-31", active: true },
+    { id: "fall-2026", name: "2026 上學期", startDate: "2026-09-01", endDate: "2027-01-31", active: false },
+  ],
   students: [
     { id: "s1", name: "陳品妤", grade: 5, lessonCount: 8, term: 2, status: "active", paymentPending: false },
     { id: "s2", name: "林冠廷", grade: 6, lessonCount: 23, term: 1, status: "active", paymentPending: false },
@@ -74,6 +77,14 @@ function normalizeSchedules(state) {
   return true;
 }
 
+function normalizeSeasons(state) {
+  const existingIds = new Set(state.seasons.map((season) => season.id));
+  const missing = seed.seasons.filter((season) => !existingIds.has(season.id));
+  if (!missing.length) return false;
+  state.seasons.push(...clone(missing));
+  return true;
+}
+
 export function getState() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) {
@@ -84,7 +95,7 @@ export function getState() {
   }
   try {
     const state = JSON.parse(stored);
-    if (normalizeSchedules(state)) saveState(state);
+    if (normalizeSchedules(state) || normalizeSeasons(state)) saveState(state);
     return state;
   } catch { localStorage.setItem(STORAGE_KEY, JSON.stringify(seed)); return clone(seed); }
 }
@@ -92,13 +103,34 @@ export function getState() {
 export function saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return state; }
 export function resetState() { localStorage.removeItem(STORAGE_KEY); return getState(); }
 export function getStudent(state, id) { return state.students.find((student) => student.id === id); }
+export function getSeasonForDate(state, date = new Date()) {
+  const dateKey = typeof date === "string" ? date : formatDate(date);
+  return state.seasons.find((season) => dateKey >= season.startDate && dateKey <= season.endDate) || state.seasons.find((season) => season.active) || state.seasons[0];
+}
 export function getSchedule(state, date, slot, season = DEFAULT_SEASON) {
   const dateKey = typeof date === "string" ? date : formatDate(addDays(getWeekStart(new Date()), date - 1));
   return state.schedules.find((item) => item.season === season && item.date === dateKey && item.slot === slot);
 }
 
-export function ensureWeek(state, date, season = DEFAULT_SEASON) {
+export function ensureWeek(state, date, season) {
   const weekDates = getWeekDates(date);
+  if (!season) {
+    let changed = false;
+    weekDates.forEach((targetDate) => {
+      const targetKey = formatDate(targetDate);
+      const targetSeason = getSeasonForDate(state, targetDate);
+      if (!targetSeason || state.schedules.some((item) => item.season === targetSeason.id && item.date === targetKey)) return;
+      const previousDate = addDays(targetDate, -7);
+      const previousSeason = getSeasonForDate(state, previousDate);
+      if (!previousSeason || previousSeason.id !== targetSeason.id) return;
+      const previousKey = formatDate(previousDate);
+      const previousDay = state.schedules.filter((item) => item.season === previousSeason.id && item.date === previousKey);
+      if (!previousDay.length) return;
+      state.schedules.push(...previousDay.map((item) => ({ ...clone(item), id: makeId("schedule"), date: targetKey, season: targetSeason.id })));
+      changed = true;
+    });
+    return changed;
+  }
   const weekKeys = new Set(weekDates.map(formatDate));
   if (state.schedules.some((item) => item.season === season && weekKeys.has(item.date))) return false;
 
@@ -123,11 +155,13 @@ export function setSchedule(state, date, slot, studentIds, season = DEFAULT_SEAS
 
 export function moveStudent(state, studentId, source, target, season = DEFAULT_SEASON) {
   if (source && (source.date !== target.date || source.slot !== target.slot)) {
-    const sourceSchedule = getSchedule(state, source.date, source.slot, season);
-    if (sourceSchedule) setSchedule(state, source.date, source.slot, sourceSchedule.studentIds.filter((id) => id !== studentId), season);
+    const sourceSeason = source.season || season;
+    const sourceSchedule = getSchedule(state, source.date, source.slot, sourceSeason);
+    if (sourceSchedule) setSchedule(state, source.date, source.slot, sourceSchedule.studentIds.filter((id) => id !== studentId), sourceSeason);
   }
-  const targetSchedule = getSchedule(state, target.date, target.slot, season);
-  setSchedule(state, target.date, target.slot, [...(targetSchedule?.studentIds || []), studentId], season);
+  const targetSeason = target.season || season;
+  const targetSchedule = getSchedule(state, target.date, target.slot, targetSeason);
+  setSchedule(state, target.date, target.slot, [...(targetSchedule?.studentIds || []), studentId], targetSeason);
   return saveState(state);
 }
 export function getTodayDate() {

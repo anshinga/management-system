@@ -1,4 +1,4 @@
-import { ensureWeek, getSchedule, getStudent, getTodayDate, getTime, getWeekStart, getWeekday, markPresent, saveState } from "../store.js";
+import { ensureWeek, getSchedule, getSeasonForDate, getStudent, getTodayDate, getTime, getWeekStart, getWeekday, markPresent, saveState } from "../store.js";
 
 const slots = ["15:00", "16:30", "18:00", "19:00", "19:30", "21:00"];
 const weekdays = ["週一", "週二", "週三", "週四", "週五", "週六"];
@@ -11,8 +11,9 @@ function displayDate(date) {
 export function renderRollCall(state, refresh) {
   const date = getTodayDate();
   const weekday = getWeekday();
+  const season = getSeasonForDate(state, date);
   if (ensureWeek(state, getWeekStart(new Date()))) saveState(state);
-  const todaySchedules = slots.map((slot) => ({ slot, schedule: getSchedule(state, date, slot) })).filter((item) => item.schedule);
+  const todaySchedules = slots.map((slot) => ({ slot, schedule: getSchedule(state, date, slot, season?.id) })).filter((item) => item.schedule);
   const present = state.attendance.filter((item) => item.date === date).length;
   const pending = state.students.filter((student) => student.paymentPending).length;
   const activeStudents = todaySchedules.flatMap(({ schedule }) => schedule.studentIds).filter((id, index, list) => list.indexOf(id) === index);

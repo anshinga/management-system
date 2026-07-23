@@ -30,26 +30,109 @@ const seed = {
 };
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
+const DEFAULT_SEASON = "summer-2026";
+
+function pad(number) { return String(number).padStart(2, "0"); }
+
+export function formatDate(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+export function parseDate(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+export function addDays(date, amount) {
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  result.setDate(result.getDate() + amount);
+  return result;
+}
+
+export function getWeekStart(date = new Date()) {
+  const result = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const weekday = result.getDay() || 7;
+  result.setDate(result.getDate() - weekday + 1);
+  return result;
+}
+
+export function getWeekDates(date = new Date()) {
+  const start = typeof date === "string" ? getWeekStart(parseDate(date)) : getWeekStart(date);
+  return Array.from({ length: 6 }, (_, index) => addDays(start, index));
+}
+
+function normalizeSchedules(state) {
+  const hasLegacySchedule = state.schedules.some((item) => !item.date && item.weekday);
+  if (!hasLegacySchedule) return false;
+  const weekStart = getWeekStart(new Date());
+  state.schedules = state.schedules.map((item) => {
+    if (item.date) return item;
+    const date = formatDate(addDays(weekStart, item.weekday - 1));
+    const { weekday, ...rest } = item;
+    return { ...rest, date };
+  });
+  return true;
+}
 
 export function getState() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(seed));
-    return clone(seed);
+    const initial = clone(seed);
+    normalizeSchedules(initial);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    return initial;
   }
-  try { return JSON.parse(stored); } catch { localStorage.setItem(STORAGE_KEY, JSON.stringify(seed)); return clone(seed); }
+  try {
+    const state = JSON.parse(stored);
+    if (normalizeSchedules(state)) saveState(state);
+    return state;
+  } catch { localStorage.setItem(STORAGE_KEY, JSON.stringify(seed)); return clone(seed); }
 }
 
 export function saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return state; }
 export function resetState() { localStorage.removeItem(STORAGE_KEY); return getState(); }
 export function getStudent(state, id) { return state.students.find((student) => student.id === id); }
-export function getSchedule(state, weekday, slot, season = "summer-2026") {
-  return state.schedules.find((item) => item.season === season && item.weekday === weekday && item.slot === slot);
+export function getSchedule(state, date, slot, season = DEFAULT_SEASON) {
+  const dateKey = typeof date === "string" ? date : formatDate(addDays(getWeekStart(new Date()), date - 1));
+  return state.schedules.find((item) => item.season === season && item.date === dateKey && item.slot === slot);
+}
+
+export function ensureWeek(state, date, season = DEFAULT_SEASON) {
+  const weekDates = getWeekDates(date);
+  const weekKeys = new Set(weekDates.map(formatDate));
+  if (state.schedules.some((item) => item.season === season && weekKeys.has(item.date))) return false;
+
+  const previousKeys = new Set(weekDates.map((item) => formatDate(addDays(item, -7))));
+  const previousWeek = state.schedules.filter((item) => item.season === season && previousKeys.has(item.date));
+  if (!previousWeek.length) return false;
+  state.schedules.push(...previousWeek.map((item) => ({ ...clone(item), id: makeId("schedule"), date: formatDate(addDays(parseDate(item.date), 7)) })));
+  return true;
+}
+
+export function setSchedule(state, date, slot, studentIds, season = DEFAULT_SEASON) {
+  const index = state.schedules.findIndex((item) => item.season === season && item.date === date && item.slot === slot);
+  const ids = [...new Set(studentIds)];
+  if (!ids.length) {
+    if (index >= 0) state.schedules.splice(index, 1);
+    return state;
+  }
+  if (index >= 0) state.schedules[index].studentIds = ids;
+  else state.schedules.push({ id: makeId("schedule"), season, date, slot, studentIds: ids });
+  return state;
+}
+
+export function moveStudent(state, studentId, source, target, season = DEFAULT_SEASON) {
+  if (source && (source.date !== target.date || source.slot !== target.slot)) {
+    const sourceSchedule = getSchedule(state, source.date, source.slot, season);
+    if (sourceSchedule) setSchedule(state, source.date, source.slot, sourceSchedule.studentIds.filter((id) => id !== studentId), season);
+  }
+  const targetSchedule = getSchedule(state, target.date, target.slot, season);
+  setSchedule(state, target.date, target.slot, [...(targetSchedule?.studentIds || []), studentId], season);
+  return saveState(state);
 }
 export function getTodayDate() {
   const now = new Date();
-  const pad = (number) => String(number).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return formatDate(now);
 }
 export function getWeekday(date = new Date()) { return date.getDay() || 7; }
 export function getTime() {

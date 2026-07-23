@@ -142,13 +142,38 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .schedule-wrap { overflow-x: auto; }
 .schedule-grid { display: grid; gap: 8px; grid-template-columns: 74px repeat(6, minmax(145px, 1fr)); min-width: 950px; }
 .schedule-label, .schedule-day { color: var(--muted); font-size: 13px; padding: 9px 8px; }
-.schedule-day { font-weight: 600; text-align: center; }
+.schedule-day { align-items: center; display: flex; flex-direction: column; font-weight: 600; gap: 2px; justify-content: center; text-align: center; }
+.schedule-day span { color: var(--gold-dark); font-size: 12px; font-weight: 500; }
 .schedule-cell { min-height: 112px; padding: 10px; }
 .schedule-cell .slot-title { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
 .schedule-names { display: flex; flex-wrap: wrap; gap: 5px; }
 .name-chip { background: var(--gold-soft); border-radius: 5px; color: var(--gold-dark); font-size: 12px; padding: 3px 6px; }
 .cell-edit { background: transparent; border: 0; color: var(--muted); font-size: 12px; margin-top: 10px; padding: 0; }
 .cell-edit:hover { color: var(--gold-dark); }
+.week-toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 18px; }
+.week-title { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: center; }
+.week-title span { color: var(--muted); font-size: 12px; }
+.schedule-editor { align-items: start; display: grid; gap: 16px; grid-template-columns: 245px minmax(0, 1fr); }
+.student-palette { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 680px; overflow: auto; padding: 15px; position: sticky; top: 14px; }
+.palette-head { align-items: baseline; display: flex; justify-content: space-between; margin-bottom: 12px; }
+.palette-head h3 { margin: 0; }
+.palette-head span { color: var(--muted); font-size: 12px; }
+.drag-hint { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 10px 0 14px; }
+.palette-groups { display: grid; gap: 14px; }
+.palette-group h4 { border-bottom: 1px solid var(--line); color: var(--gold-dark); font-size: 13px; margin: 0 0 7px; padding-bottom: 5px; }
+.palette-list, .cell-students { display: grid; gap: 6px; }
+.drag-student { align-items: center; border: 1px solid var(--line); border-radius: 7px; display: flex; gap: 7px; user-select: none; }
+.drag-student[draggable="true"] { cursor: grab; }
+.drag-student.is-dragging { opacity: .45; }
+.palette-student { background: var(--surface-alt); min-height: 38px; padding: 7px 8px; touch-action: none; }
+.palette-student:hover { border-color: var(--gold); }
+.schedule-board { min-width: 0; padding: 14px; }
+.schedule-board .schedule-cell { min-height: 132px; transition: background .15s, border-color .15s; }
+.schedule-board .schedule-cell.is-drop-target { background: var(--gold-soft); border-color: var(--gold); }
+.cell-count { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+.schedule-student { background: var(--gold-soft); border-color: transparent; color: var(--gold-dark); justify-content: space-between; padding: 6px 7px; touch-action: none; }
+.schedule-student:hover { border-color: var(--gold); }
+.schedule-student small { color: var(--muted); font-size: 10px; }
 .record-list { display: grid; gap: 12px; }
 .record-row { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .record-meta { background: var(--surface-alt); gap: 12px; min-width: 185px; padding: 13px 15px; }
@@ -185,6 +210,13 @@ body.dark .student-card.is-present { background: #283b2d; border-color: #53755b;
   .form-grid { grid-template-columns: 1fr 1fr; }
   .form-grid .field:first-child { grid-column: span 2; }
   .form-actions { grid-column: span 2; }
+  .week-toolbar { flex-wrap: wrap; }
+  .week-title { order: 1; width: calc(100% - 100px); }
+  .week-toolbar [data-action="current-week"] { margin-left: auto; order: 2; }
+  .schedule-editor { display: flex; flex-direction: column; }
+  .student-palette { max-height: none; position: static; width: 100%; }
+  .palette-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .schedule-board { width: 100%; }
   .record-row { display: block; }
   .record-meta { border-bottom: 1px solid var(--line); }
   .record-item:first-child { border-left: 0; }

@@ -153,26 +153,37 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .week-toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 18px; }
 .week-title { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: center; }
 .week-title span { color: var(--muted); font-size: 12px; }
-.schedule-editor { align-items: start; display: grid; gap: 16px; grid-template-columns: 245px minmax(0, 1fr); }
+.schedule-editor { align-items: start; display: grid; gap: 16px; grid-template-columns: 210px minmax(0, 1fr); min-width: 0; }
 .student-palette { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 680px; overflow: auto; padding: 15px; position: sticky; top: 14px; }
 .palette-head { align-items: baseline; display: flex; justify-content: space-between; margin-bottom: 12px; }
 .palette-head h3 { margin: 0; }
+.palette-tools { align-items: center; display: flex; gap: 6px; }
 .palette-head span { color: var(--muted); font-size: 12px; }
+.student-palette #schedule-search { width: 100%; }
+.collapse-button { background: transparent; border: 0; color: var(--muted); font-size: 12px; padding: 2px 0; }
+.collapse-button:hover { color: var(--gold-dark); }
 .drag-hint { color: var(--muted); font-size: 12px; line-height: 1.45; margin: 10px 0 14px; }
 .palette-groups { display: grid; gap: 14px; }
 .palette-group h4 { border-bottom: 1px solid var(--line); color: var(--gold-dark); font-size: 13px; margin: 0 0 7px; padding-bottom: 5px; }
-.palette-list, .cell-students { display: grid; gap: 6px; }
+.palette-list, .cell-students { display: grid; gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .drag-student { align-items: center; border: 1px solid var(--line); border-radius: 7px; display: flex; gap: 7px; user-select: none; }
 .drag-student[draggable="true"] { cursor: grab; }
 .drag-student.is-dragging { opacity: .45; }
 .palette-student { background: var(--surface-alt); min-height: 38px; padding: 7px 8px; touch-action: none; }
 .palette-student:hover { border-color: var(--gold); }
 .schedule-board { min-width: 0; padding: 14px; }
+.schedule-board .schedule-wrap { overflow: hidden; }
+.schedule-board .schedule-grid { grid-template-columns: 50px repeat(6, minmax(0, 1fr)); min-width: 0; width: 100%; }
 .schedule-board .schedule-cell { min-height: 132px; transition: background .15s, border-color .15s; }
 .schedule-board .schedule-cell.is-drop-target { background: var(--gold-soft); border-color: var(--gold); }
 .cell-count { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
-.schedule-student { background: var(--gold-soft); border-color: transparent; color: var(--gold-dark); justify-content: space-between; padding: 6px 7px; touch-action: none; }
+.schedule-student { background: var(--gold-soft); border-color: transparent; color: var(--gold-dark); min-width: 0; overflow-wrap: anywhere; padding: 6px 7px; touch-action: none; }
 .schedule-student:hover { border-color: var(--gold); }
+.schedule-student span { min-width: 0; }
+.collapsed-palette-bar { display: none; }
+.schedule-editor.palette-collapsed { grid-template-columns: minmax(0, 1fr); }
+.schedule-editor.palette-collapsed .student-palette { display: none; }
+.schedule-editor.palette-collapsed .collapsed-palette-bar { display: flex; margin-bottom: 10px; }
 .schedule-student small { color: var(--muted); font-size: 10px; }
 .record-list { display: grid; gap: 12px; }
 .record-row { border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
@@ -217,6 +228,13 @@ body.dark .student-card.is-present { background: #283b2d; border-color: #53755b;
   .student-palette { max-height: none; position: static; width: 100%; }
   .palette-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .schedule-board { width: 100%; }
+  .schedule-board { padding: 6px; }
+  .schedule-board .schedule-grid { gap: 3px; grid-template-columns: 42px repeat(6, minmax(0, 1fr)); }
+  .schedule-board .schedule-cell { min-height: 102px; padding: 5px 3px; }
+  .schedule-board .schedule-day { font-size: 10px; padding: 6px 1px; }
+  .schedule-board .schedule-label { font-size: 10px; padding: 6px 1px; }
+  .schedule-student { font-size: 11px; padding: 5px 3px; }
+  .cell-count { font-size: 10px; margin-bottom: 5px; }
   .record-row { display: block; }
   .record-meta { border-bottom: 1px solid var(--line); }
   .record-item:first-child { border-left: 0; }

@@ -1,0 +1,8 @@
+{
+  "description": "本機雛形使用的示範資料；正式版可改由 Firebase 匯入。",
+  "students": [
+    { "name": "陳品妤", "grade": 5, "lessonCount": 8, "term": 2 },
+    { "name": "林冠廷", "grade": 6, "lessonCount": 23, "term": 1 },
+    { "name": "王思涵", "grade": 3, "lessonCount": 24, "term": 3 }
+  ]
+}

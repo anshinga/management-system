@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f5f3" />
+    <title>MPM 點名系統</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./css/style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-mark">MPM</span>
+        <div>
+          <p class="eyebrow">數學課程管理</p>
+          <h1>點名系統</h1>
+        </div>
+      </div>
+      <div class="header-actions">
+        <span class="storage-status">本機測試模式</span>
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="切換深色模式">深</button>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <nav class="tab-bar" aria-label="主要功能">
+        <button class="tab is-active" data-route="roll-call" type="button">今日點名</button>
+        <button class="tab" data-route="students" type="button">學生</button>
+        <button class="tab" data-route="schedule" type="button">排課</button>
+        <button class="tab" data-route="records" type="button">紀錄</button>
+        <button class="tab" data-route="payment" type="button">繳費</button>
+      </nav>
+
+      <section id="app" aria-live="polite"></section>
+    </main>
+
+    <div id="toast" class="toast" role="status"></div>
+    <script type="module" src="./js/app.js"></script>
+  </body>
+</html>

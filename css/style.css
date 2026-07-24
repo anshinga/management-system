@@ -90,6 +90,9 @@ h3 { font-size: 18px; margin-bottom: 2px; }
   padding: 8px 10px;
 }
 .input:focus, .select:focus { border-color: var(--gold); outline: 2px solid var(--gold-soft); }
+.date-control { align-items: end; display: flex; gap: 8px; }
+.date-control label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.date-control .input { min-width: 150px; }
 .stat-grid { display: grid; gap: 14px; grid-template-columns: repeat(3, 1fr); margin-bottom: 26px; }
 .stat, .panel, .class-section, .student-card, .payment-row, .schedule-cell {
   background: var(--surface);
@@ -176,8 +179,12 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .schedule-board .schedule-grid { grid-template-columns: 50px repeat(6, minmax(0, 1fr)); min-width: 0; width: 100%; }
 .schedule-board .schedule-cell { min-height: 132px; transition: background .15s, border-color .15s; }
 .schedule-board .schedule-cell.is-drop-target { background: var(--gold-soft); border-color: var(--gold); }
-.cell-count { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+.cell-count { align-items: center; color: var(--muted); display: flex; font-size: 12px; gap: 6px; justify-content: space-between; margin-bottom: 8px; }
+.cell-attendance-count { color: var(--success); font-weight: 600; white-space: nowrap; }
+.schedule-board .schedule-cell.is-attendance-date { background: var(--surface-alt); }
+.schedule-board .schedule-cell.has-attendance { border-color: var(--success); }
 .schedule-student { background: var(--gold-soft); border-color: transparent; color: var(--gold-dark); min-width: 0; overflow-wrap: anywhere; padding: 6px 7px; touch-action: none; }
+.schedule-student.is-present { background: #e5f2e8; border-color: #b8d4be; color: var(--success); }
 .schedule-student:hover { border-color: var(--gold); }
 .schedule-student span { min-width: 0; }
 .collapsed-palette-bar { display: none; }
@@ -213,6 +220,7 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 body.dark { --bg: #1d1e1b; --surface: #282925; --surface-alt: #22231f; --text: #f2f1e9; --muted: #a8a99e; --line: #464740; --gold-soft: #4c401d; --success: #8fc29a; --warning: #e1a56f; }
 body.dark .student-card.is-present { background: #283b2d; border-color: #53755b; }
+body.dark .schedule-student.is-present { background: #283b2d; border-color: #53755b; color: var(--success); }
 @media (max-width: 720px) {
   .app-header { padding: 14px 16px; }
   .app-shell { padding: 18px 14px 50px; }

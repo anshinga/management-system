@@ -1,4 +1,5 @@
 const STORAGE_KEY = "mpm-attendance-prototype-v1";
+const ATTENDANCE_DATE_KEY = "mpm-selected-attendance-date";
 
 const seed = {
   lastGradePromotionYear: 2025,
@@ -276,6 +277,30 @@ export function getTodayDate() {
   const now = new Date();
   return formatDate(now);
 }
+
+function isDateKey(value) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = parseDate(value);
+  return formatDate(date) === value;
+}
+
+export function getSelectedAttendanceDate() {
+  const today = getTodayDate();
+  const stored = localStorage.getItem(ATTENDANCE_DATE_KEY);
+  if (!stored || !isDateKey(stored) || stored > today) {
+    localStorage.setItem(ATTENDANCE_DATE_KEY, today);
+    return today;
+  }
+  return stored;
+}
+
+export function setSelectedAttendanceDate(date) {
+  const today = getTodayDate();
+  const selected = isDateKey(date) && date <= today ? date : today;
+  localStorage.setItem(ATTENDANCE_DATE_KEY, selected);
+  return selected;
+}
+
 export function getWeekday(date = new Date()) { return date.getDay() || 7; }
 export function getTime() {
   const now = new Date();

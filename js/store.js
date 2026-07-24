@@ -119,26 +119,30 @@ export function ensureWeek(state, date, season) {
     weekDates.forEach((targetDate) => {
       const targetKey = formatDate(targetDate);
       const targetSeason = getSeasonForDate(state, targetDate);
-      if (!targetSeason || state.schedules.some((item) => item.season === targetSeason.id && item.date === targetKey)) return;
+      if (!targetSeason) return;
       const previousDate = addDays(targetDate, -7);
       const previousSeason = getSeasonForDate(state, previousDate);
       if (!previousSeason || previousSeason.id !== targetSeason.id) return;
       const previousKey = formatDate(previousDate);
       const previousDay = state.schedules.filter((item) => item.season === previousSeason.id && item.date === previousKey);
-      if (!previousDay.length) return;
-      state.schedules.push(...previousDay.map((item) => ({ ...clone(item), id: makeId("schedule"), date: targetKey, season: targetSeason.id })));
-      changed = true;
+      previousDay.forEach((item) => {
+        if (state.schedules.some((existing) => existing.season === targetSeason.id && existing.date === targetKey && existing.slot === item.slot)) return;
+        state.schedules.push({ ...clone(item), id: makeId("schedule"), date: targetKey, season: targetSeason.id });
+        changed = true;
+      });
     });
     return changed;
   }
-  const weekKeys = new Set(weekDates.map(formatDate));
-  if (state.schedules.some((item) => item.season === season && weekKeys.has(item.date))) return false;
-
   const previousKeys = new Set(weekDates.map((item) => formatDate(addDays(item, -7))));
   const previousWeek = state.schedules.filter((item) => item.season === season && previousKeys.has(item.date));
-  if (!previousWeek.length) return false;
-  state.schedules.push(...previousWeek.map((item) => ({ ...clone(item), id: makeId("schedule"), date: formatDate(addDays(parseDate(item.date), 7)) })));
-  return true;
+  let changed = false;
+  previousWeek.forEach((item) => {
+    const date = formatDate(addDays(parseDate(item.date), 7));
+    if (state.schedules.some((existing) => existing.season === season && existing.date === date && existing.slot === item.slot)) return;
+    state.schedules.push({ ...clone(item), id: makeId("schedule"), date });
+    changed = true;
+  });
+  return changed;
 }
 
 export function setSchedule(state, date, slot, studentIds, season = DEFAULT_SEASON) {
@@ -153,7 +157,7 @@ export function setSchedule(state, date, slot, studentIds, season = DEFAULT_SEAS
   return state;
 }
 
-export function moveStudent(state, studentId, source, target, season = DEFAULT_SEASON) {
+function applyStudentMove(state, studentId, source, target, season = DEFAULT_SEASON) {
   if (source && (source.date !== target.date || source.slot !== target.slot)) {
     const sourceSeason = source.season || season;
     const sourceSchedule = getSchedule(state, source.date, source.slot, sourceSeason);
@@ -162,6 +166,27 @@ export function moveStudent(state, studentId, source, target, season = DEFAULT_S
   const targetSeason = target.season || season;
   const targetSchedule = getSchedule(state, target.date, target.slot, targetSeason);
   setSchedule(state, target.date, target.slot, [...(targetSchedule?.studentIds || []), studentId], targetSeason);
+}
+
+function shiftScheduleLocation(state, location, season = DEFAULT_SEASON) {
+  if (!location?.date) return null;
+  const expectedSeason = location.season || season;
+  const date = formatDate(addDays(parseDate(location.date), 7));
+  const nextSeason = getSeasonForDate(state, date)?.id;
+  if (!nextSeason || nextSeason !== expectedSeason) return null;
+  return { ...location, date, season: nextSeason };
+}
+
+export function moveStudent(state, studentId, source, target, season = DEFAULT_SEASON) {
+  const sourceSeason = source?.season || season;
+  const targetSeason = target.season || season;
+  applyStudentMove(state, studentId, source, target, season);
+
+  const nextSource = source ? shiftScheduleLocation(state, source, sourceSeason) : null;
+  const nextTarget = shiftScheduleLocation(state, target, targetSeason);
+  const canSyncNextWeek = nextTarget && (!source || nextSource) && (!source || sourceSeason === targetSeason);
+  if (canSyncNextWeek) applyStudentMove(state, studentId, nextSource, nextTarget, nextTarget.season);
+
   return saveState(state);
 }
 export function getTodayDate() {

@@ -2,6 +2,7 @@ const STORAGE_KEY = "mpm-attendance-prototype-v1";
 
 const seed = {
   lastGradePromotionYear: 2025,
+  scheduleOverrides: [],
   seasons: [
     { id: "summer-2026", name: "2026 暑假", startDate: "2026-07-01", endDate: "2026-08-31", active: true },
     { id: "fall-2026", name: "2026 上學期", startDate: "2026-09-01", endDate: "2027-01-31", active: false },
@@ -111,12 +112,19 @@ function normalizeSeasons(state) {
   return true;
 }
 
+function normalizeScheduleOverrides(state) {
+  if (Array.isArray(state.scheduleOverrides)) return false;
+  state.scheduleOverrides = [];
+  return true;
+}
+
 export function getState() {
   const stored = localStorage.getItem(STORAGE_KEY);
   if (!stored) {
     const initial = clone(seed);
     normalizeSchedules(initial);
     normalizeGradePromotion(initial);
+    normalizeScheduleOverrides(initial);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
     return initial;
   }
@@ -125,12 +133,14 @@ export function getState() {
     const schedulesChanged = normalizeSchedules(state);
     const seasonsChanged = normalizeSeasons(state);
     const gradesChanged = normalizeGradePromotion(state);
-    if (schedulesChanged || seasonsChanged || gradesChanged) saveState(state);
+    const overridesChanged = normalizeScheduleOverrides(state);
+    if (schedulesChanged || seasonsChanged || gradesChanged || overridesChanged) saveState(state);
     return state;
   } catch {
     const initial = clone(seed);
     normalizeSchedules(initial);
     normalizeGradePromotion(initial);
+    normalizeScheduleOverrides(initial);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
     return initial;
   }
@@ -148,35 +158,65 @@ export function getSchedule(state, date, slot, season = DEFAULT_SEASON) {
   return state.schedules.find((item) => item.season === season && item.date === dateKey && item.slot === slot);
 }
 
+function getWeekKey(date) {
+  const value = typeof date === "string" ? parseDate(date) : date;
+  return formatDate(getWeekStart(value));
+}
+
+function hasScheduleOverride(state, studentId, date, season) {
+  const weekStart = getWeekKey(date);
+  return (state.scheduleOverrides || []).some((item) => item.studentId === studentId && item.season === season && item.weekStart === weekStart);
+}
+
+function markScheduleOverride(state, studentId, date, season) {
+  if (!studentId || !date || !season) return;
+  if (!Array.isArray(state.scheduleOverrides)) state.scheduleOverrides = [];
+  if (hasScheduleOverride(state, studentId, date, season)) return;
+  state.scheduleOverrides.push({ studentId, season, weekStart: getWeekKey(date) });
+}
+
+function copyMissingStudents(state, targetDate, targetSeason, previousDate, previousSeason) {
+  const targetKey = formatDate(targetDate);
+  const previousKey = formatDate(previousDate);
+  const previousSchedules = state.schedules.filter((item) => item.season === previousSeason.id && item.date === previousKey);
+  let changed = false;
+
+  previousSchedules.forEach((previousSchedule) => {
+    const targetSchedule = getSchedule(state, targetKey, previousSchedule.slot, targetSeason.id);
+    const existingStudentIds = targetSchedule?.studentIds || [];
+    const studentIds = previousSchedule.studentIds.filter((studentId) => !existingStudentIds.includes(studentId) && !hasScheduleOverride(state, studentId, targetKey, targetSeason.id));
+    if (!studentIds.length) return;
+    setSchedule(state, targetKey, previousSchedule.slot, [...existingStudentIds, ...studentIds], targetSeason.id);
+    changed = true;
+  });
+
+  return changed;
+}
+
 export function ensureWeek(state, date, season) {
   const weekDates = getWeekDates(date);
   if (!season) {
     let changed = false;
     weekDates.forEach((targetDate) => {
-      const targetKey = formatDate(targetDate);
       const targetSeason = getSeasonForDate(state, targetDate);
       if (!targetSeason) return;
       const previousDate = addDays(targetDate, -7);
       const previousSeason = getSeasonForDate(state, previousDate);
       if (!previousSeason || previousSeason.id !== targetSeason.id) return;
-      const previousKey = formatDate(previousDate);
-      const previousDay = state.schedules.filter((item) => item.season === previousSeason.id && item.date === previousKey);
-      previousDay.forEach((item) => {
-        if (state.schedules.some((existing) => existing.season === targetSeason.id && existing.date === targetKey && existing.slot === item.slot)) return;
-        state.schedules.push({ ...clone(item), id: makeId("schedule"), date: targetKey, season: targetSeason.id });
-        changed = true;
-      });
+      if (copyMissingStudents(state, targetDate, targetSeason, previousDate, previousSeason)) changed = true;
     });
     return changed;
   }
   const previousKeys = new Set(weekDates.map((item) => formatDate(addDays(item, -7))));
   const previousWeek = state.schedules.filter((item) => item.season === season && previousKeys.has(item.date));
+  const previousDates = [...new Set(previousWeek.map((item) => item.date))];
   let changed = false;
-  previousWeek.forEach((item) => {
-    const date = formatDate(addDays(parseDate(item.date), 7));
-    if (state.schedules.some((existing) => existing.season === season && existing.date === date && existing.slot === item.slot)) return;
-    state.schedules.push({ ...clone(item), id: makeId("schedule"), date });
-    changed = true;
+  previousDates.forEach((previousKey) => {
+    const previousDate = parseDate(previousKey);
+    const targetDate = addDays(previousDate, 7);
+    const targetSeason = getSeasonForDate(state, targetDate);
+    if (!targetSeason || targetSeason.id !== season) return;
+    if (copyMissingStudents(state, targetDate, targetSeason, previousDate, { id: season })) changed = true;
   });
   return changed;
 }
@@ -204,10 +244,10 @@ function applyStudentMove(state, studentId, source, target, season = DEFAULT_SEA
   setSchedule(state, target.date, target.slot, [...(targetSchedule?.studentIds || []), studentId], targetSeason);
 }
 
-function shiftScheduleLocation(state, location, season = DEFAULT_SEASON) {
+function shiftScheduleLocation(state, location, weeks, season = DEFAULT_SEASON) {
   if (!location?.date) return null;
   const expectedSeason = location.season || season;
-  const date = formatDate(addDays(parseDate(location.date), 7));
+  const date = formatDate(addDays(parseDate(location.date), weeks * 7));
   const nextSeason = getSeasonForDate(state, date)?.id;
   if (!nextSeason || nextSeason !== expectedSeason) return null;
   return { ...location, date, season: nextSeason };
@@ -216,12 +256,19 @@ function shiftScheduleLocation(state, location, season = DEFAULT_SEASON) {
 export function moveStudent(state, studentId, source, target, season = DEFAULT_SEASON) {
   const sourceSeason = source?.season || season;
   const targetSeason = target.season || season;
+  markScheduleOverride(state, studentId, target.date, targetSeason);
+  if (source) markScheduleOverride(state, studentId, source.date, sourceSeason);
   applyStudentMove(state, studentId, source, target, season);
 
-  const nextSource = source ? shiftScheduleLocation(state, source, sourceSeason) : null;
-  const nextTarget = shiftScheduleLocation(state, target, targetSeason);
-  const canSyncNextWeek = nextTarget && (!source || nextSource) && (!source || sourceSeason === targetSeason);
-  if (canSyncNextWeek) applyStudentMove(state, studentId, nextSource, nextTarget, nextTarget.season);
+  if (sourceSeason === targetSeason) {
+    for (let weeks = 1; ; weeks += 1) {
+      const nextTarget = shiftScheduleLocation(state, target, weeks, targetSeason);
+      if (!nextTarget || hasScheduleOverride(state, studentId, nextTarget.date, nextTarget.season)) break;
+      const nextSource = source ? shiftScheduleLocation(state, source, weeks, sourceSeason) : null;
+      if (source && !nextSource) break;
+      applyStudentMove(state, studentId, nextSource, nextTarget, nextTarget.season);
+    }
+  }
 
   return saveState(state);
 }

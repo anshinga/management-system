@@ -1,6 +1,7 @@
 const STORAGE_KEY = "mpm-attendance-prototype-v1";
 
 const seed = {
+  lastGradePromotionYear: 2025,
   seasons: [
     { id: "summer-2026", name: "2026 暑假", startDate: "2026-07-01", endDate: "2026-08-31", active: true },
     { id: "fall-2026", name: "2026 上學期", startDate: "2026-09-01", endDate: "2027-01-31", active: false },
@@ -34,6 +35,31 @@ const seed = {
 
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 const DEFAULT_SEASON = "summer-2026";
+
+function getGradePromotionYear(date = new Date()) {
+  const promotionDate = new Date(date.getFullYear(), 6, 1);
+  return date >= promotionDate ? date.getFullYear() : date.getFullYear() - 1;
+}
+
+function normalizeGradePromotion(state, date = new Date()) {
+  const promotionYear = getGradePromotionYear(date);
+  const hasMarker = Number.isInteger(state.lastGradePromotionYear);
+  const currentYearAfterPromotionDate = date >= new Date(date.getFullYear(), 6, 1);
+  const lastGradePromotionYear = hasMarker
+    ? state.lastGradePromotionYear
+    : currentYearAfterPromotionDate ? promotionYear - 1 : promotionYear;
+
+  if (!hasMarker) state.lastGradePromotionYear = lastGradePromotionYear;
+  if (lastGradePromotionYear >= promotionYear) return !hasMarker;
+
+  const yearsToPromote = promotionYear - lastGradePromotionYear;
+  state.students.forEach((student) => {
+    const grade = Number(student.grade);
+    if (Number.isFinite(grade)) student.grade = grade + yearsToPromote;
+  });
+  state.lastGradePromotionYear = promotionYear;
+  return true;
+}
 
 function pad(number) { return String(number).padStart(2, "0"); }
 
@@ -90,14 +116,24 @@ export function getState() {
   if (!stored) {
     const initial = clone(seed);
     normalizeSchedules(initial);
+    normalizeGradePromotion(initial);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
     return initial;
   }
   try {
     const state = JSON.parse(stored);
-    if (normalizeSchedules(state) || normalizeSeasons(state)) saveState(state);
+    const schedulesChanged = normalizeSchedules(state);
+    const seasonsChanged = normalizeSeasons(state);
+    const gradesChanged = normalizeGradePromotion(state);
+    if (schedulesChanged || seasonsChanged || gradesChanged) saveState(state);
     return state;
-  } catch { localStorage.setItem(STORAGE_KEY, JSON.stringify(seed)); return clone(seed); }
+  } catch {
+    const initial = clone(seed);
+    normalizeSchedules(initial);
+    normalizeGradePromotion(initial);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
+    return initial;
+  }
 }
 
 export function saveState(state) { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return state; }

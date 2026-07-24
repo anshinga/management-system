@@ -201,6 +201,12 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 90vh; max-width: 520px; overflow: auto; padding: 20px; width: 100%; }
 .modal-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 15px; }
 .modal-head h3 { margin: 0; }
+.modal-close { background: transparent; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); padding: 6px 10px; }
+.modal-close:hover { border-color: var(--gold); color: var(--gold-dark); }
+.modal-form { display: grid; gap: 18px; }
+.modal-form-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.modal-form-grid .field-wide { grid-column: 1 / -1; }
+.modal-form .form-actions { justify-content: flex-end; }
 .checkbox-list { display: grid; gap: 8px; grid-template-columns: repeat(2, 1fr); margin-bottom: 18px; }
 .checkbox-item { align-items: center; background: var(--surface-alt); border: 1px solid var(--line); border-radius: 6px; display: flex; gap: 8px; padding: 8px; }
 .toast { background: var(--text); border-radius: 7px; bottom: 22px; color: white; left: 50%; opacity: 0; padding: 10px 15px; pointer-events: none; position: fixed; transform: translate(-50%, 12px); transition: opacity .2s, transform .2s; z-index: 20; }
@@ -221,6 +227,9 @@ body.dark .student-card.is-present { background: #283b2d; border-color: #53755b;
   .form-grid { grid-template-columns: 1fr 1fr; }
   .form-grid .field:first-child { grid-column: span 2; }
   .form-actions { grid-column: span 2; }
+  .modal { padding: 16px; }
+  .modal-form-grid { grid-template-columns: 1fr; }
+  .modal-form-grid .field-wide { grid-column: auto; }
   .week-toolbar { flex-wrap: wrap; }
   .week-title { order: 1; width: calc(100% - 100px); }
   .week-toolbar [data-action="current-week"] { margin-left: auto; order: 2; }

@@ -320,6 +320,43 @@ export function markPresent(state, studentId, date, slot, arrivalTime = getTime(
   return saveState(state);
 }
 
+function adjustLessonCount(state, studentId, record, amount) {
+  if (!record || record.type === "leave") return;
+  const student = getStudent(state, studentId);
+  if (!student || Number(record.term) !== Number(student.term)) return;
+  student.lessonCount = Math.max(0, Number(student.lessonCount || 0) + amount);
+  student.paymentPending = student.lessonCount >= 24;
+}
+
+export function updateAttendance(state, attendanceId, changes = {}) {
+  const record = state.attendance.find((item) => item.id === attendanceId && item.type !== "leave");
+  if (!record) return { ok: false, message: "找不到這筆點名紀錄。" };
+  const nextStudentId = changes.studentId || record.studentId;
+  const nextStudent = getStudent(state, nextStudentId);
+  if (!nextStudent) return { ok: false, message: "找不到指定的學生。" };
+  if (nextStudentId !== record.studentId) {
+    const duplicate = state.attendance.some((item) => item.id !== attendanceId && item.type !== "leave" && item.studentId === nextStudentId && item.date === record.date && item.slot === record.slot);
+    if (duplicate) return { ok: false, message: "這位學生在同一天同一時段已有點名紀錄。" };
+    adjustLessonCount(state, record.studentId, record, -1);
+    adjustLessonCount(state, nextStudentId, { ...record, term: nextStudent.term }, 1);
+    record.studentId = nextStudentId;
+    record.lessonNumber = nextStudent.lessonCount;
+    record.term = nextStudent.term;
+  }
+  if (changes.arrivalTime) record.arrivalTime = changes.arrivalTime;
+  saveState(state);
+  return { ok: true, state };
+}
+
+export function removeAttendance(state, attendanceId) {
+  const index = state.attendance.findIndex((item) => item.id === attendanceId && item.type !== "leave");
+  if (index < 0) return { ok: false, message: "找不到這筆點名紀錄。" };
+  const [record] = state.attendance.splice(index, 1);
+  adjustLessonCount(state, record.studentId, record, -1);
+  saveState(state);
+  return { ok: true, state };
+}
+
 export function confirmPayment(state, studentId) {
   const student = getStudent(state, studentId);
   if (student) { student.lessonCount = 0; student.term += 1; student.paymentPending = false; }

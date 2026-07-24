@@ -60,7 +60,7 @@ function renderCell(state, date, slot) {
   const attendedCount = students.filter((student) => presentStudentIds.has(student.id)).length;
   const isAttendanceDate = dateKey === attendanceDate;
   const cellClass = `schedule-cell${isAttendanceDate ? " is-attendance-date" : ""}${isAttendanceDate && attendedCount ? " has-attendance" : ""}`;
-  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}"><div class="cell-count"><span>${students.length} 人</span>${isAttendanceDate ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}</div><div class="cell-students">${students.map((student) => `<div class="drag-student schedule-student${isAttendanceDate && presentStudentIds.has(student.id) ? " is-present" : ""}" draggable="true" data-drag-student="${student.id}" data-drag-source="schedule" data-source-date="${dateKey}" data-source-slot="${slot}" data-source-season="${seasonId}" title="拖曳以調整時間"><span>${student.name}</span></div>`).join("") || '<span class="student-subtitle">尚未排課</span>'}</div></div>`;
+  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}"><div class="cell-count"><span>${students.length} 人</span>${isAttendanceDate ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}</div><div class="cell-students">${students.map((student) => { const isLocked = presentStudentIds.has(student.id); const studentClass = `drag-student schedule-student${isAttendanceDate && isLocked ? " is-present" : ""}${isLocked ? " is-locked" : ""}`; const dragAttributes = isLocked ? `aria-disabled="true" title="已簽到，無法調整排課"` : `draggable="true" title="拖曳以調整時間"`; return `<div class="${studentClass}" ${dragAttributes} data-drag-student="${student.id}" data-drag-source="schedule" data-source-date="${dateKey}" data-source-slot="${slot}" data-source-season="${seasonId}"><span>${student.name}</span></div>`; }).join("") || '<span class="student-subtitle">尚未排課</span>'}</div></div>`;
 }
 
 export function bindSchedule(app, state, refresh) {
@@ -80,7 +80,7 @@ export function bindSchedule(app, state, refresh) {
 
   let desktopDrag = null;
   let touchDrag = null;
-  const dragItems = [...app.querySelectorAll("[data-drag-student]")];
+  const dragItems = [...app.querySelectorAll("[data-drag-student]:not(.is-locked)")];
   const cells = [...app.querySelectorAll(".schedule-cell")];
   const getDragData = (item) => ({
     studentId: item.dataset.dragStudent,
@@ -88,6 +88,8 @@ export function bindSchedule(app, state, refresh) {
   });
   const drop = (data, cell) => {
     if (!cell || !data) return;
+    const hasAttendanceOnDate = (date) => state.attendance.some((item) => item.studentId === data.studentId && item.date === date && item.type !== "leave");
+    if (hasAttendanceOnDate(cell.dataset.date) || (data.source && hasAttendanceOnDate(data.source.date))) return;
     moveStudent(state, data.studentId, data.source, { date: cell.dataset.date, slot: cell.dataset.slot, season: cell.dataset.season });
     refresh();
   };

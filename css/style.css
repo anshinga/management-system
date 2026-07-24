@@ -108,8 +108,8 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .class-heading { align-items: center; background: var(--surface-alt); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; padding: 13px 17px; }
 .class-heading h3 { margin: 0; }
 .class-heading span { color: var(--muted); font-size: 13px; }
-.class-students { display: grid; gap: 10px; padding: 12px; }
-.student-card { align-items: center; display: flex; gap: 12px; justify-content: space-between; padding: 12px 14px; }
+.class-students { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+.student-card { align-items: center; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 12px 14px; }
 .student-card.is-present { background: #f2f8f2; border-color: #b8d4be; }
 .student-summary { gap: 10px; min-width: 0; }
 .student-name { font-weight: 600; }
@@ -125,7 +125,8 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .status-badge.active { background: #e5f2e8; color: var(--success); }
 .status-badge.paused { background: #eee; color: var(--muted); }
 .pending-badge { background: #f9ead9; color: var(--warning); }
-.attendance-actions { gap: 8px; }
+.attendance-actions { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.button-edit-attendance { padding: 8px 11px; }
 .attendance-time { color: var(--success); font-size: 13px; white-space: nowrap; }
 .button-attend { background: var(--text); border: 1px solid var(--text); border-radius: 7px; color: white; min-width: 70px; padding: 8px 11px; }
 .is-present .button-attend { background: transparent; border-color: #9fc0a5; color: var(--success); }
@@ -185,6 +186,7 @@ h3 { font-size: 18px; margin-bottom: 2px; }
 .schedule-board .schedule-cell.has-attendance { border-color: var(--success); }
 .schedule-student { background: var(--gold-soft); border-color: transparent; color: var(--gold-dark); min-width: 0; overflow-wrap: anywhere; padding: 6px 7px; touch-action: none; }
 .schedule-student.is-present { background: #e5f2e8; border-color: #b8d4be; color: var(--success); }
+.schedule-student.is-locked { cursor: not-allowed; opacity: .82; }
 .schedule-student:hover { border-color: var(--gold); }
 .schedule-student span { min-width: 0; }
 .collapsed-palette-bar { display: none; }
@@ -231,6 +233,7 @@ body.dark .schedule-student.is-present { background: #283b2d; border-color: #537
   .stat { padding: 12px; }
   .stat-value { font-size: 22px; }
   .student-card { align-items: start; flex-direction: column; }
+  .class-students { grid-template-columns: 1fr; }
   .attendance-actions { align-self: stretch; justify-content: space-between; }
   .form-grid { grid-template-columns: 1fr 1fr; }
   .form-grid .field:first-child { grid-column: span 2; }

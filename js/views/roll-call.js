@@ -1,4 +1,4 @@
-import { ensureWeek, getSchedule, getSeasonForDate, getSelectedAttendanceDate, getStudent, getTodayDate, getTime, getWeekStart, getWeekday, markPresent, parseDate, saveState, setSelectedAttendanceDate } from "../store.js";
+import { ensureWeek, getSchedule, getSeasonForDate, getSelectedAttendanceDate, getStudent, getTodayDate, getTime, getWeekStart, getWeekday, markPresent, parseDate, removeAttendance, saveState, setSelectedAttendanceDate, updateAttendance } from "../store.js";
 
 const slots = ["15:00", "16:30", "18:00", "19:00", "19:30", "21:00"];
 const weekdays = ["週一", "週二", "週三", "週四", "週五", "週六"];
@@ -44,7 +44,51 @@ function renderStudent(state, date, slot, id, refresh) {
   const student = getStudent(state, id);
   const record = state.attendance.find((item) => item.studentId === id && item.date === date && item.slot === slot && item.type !== "leave");
   if (!student) return "";
-  return `<article class="student-card ${record ? "is-present" : ""}"><div class="student-summary"><span class="grade-badge">${student.grade} 年級</span><div><div class="student-name">${student.name}</div><div class="student-subtitle">第 ${student.lessonCount} / 24 堂・第 ${student.term} 期 ${student.status === "paused" ? "・停課" : ""}</div></div>${student.paymentPending ? '<span class="pending-badge">待繳費</span>' : ""}</div><div class="attendance-actions">${record ? `<span class="attendance-time">${record.arrivalTime} 到班</span>` : ""}<button class="button-attend" data-action="attend" data-student-id="${id}" data-slot="${slot}">${record ? "修改時間" : "到班"}</button></div></article>`;
+  return `<article class="student-card ${record ? "is-present" : ""}"><div class="student-summary"><span class="grade-badge">${student.grade} 年級</span><div><div class="student-name">${student.name}</div><div class="student-subtitle">第 ${student.lessonCount} / 24 堂・第 ${student.term} 期 ${student.status === "paused" ? "・停課" : ""}</div></div>${student.paymentPending ? '<span class="pending-badge">待繳費</span>' : ""}</div><div class="attendance-actions">${record ? `<span class="attendance-time">${record.arrivalTime} 到班</span>` : ""}<button class="button-attend" data-action="attend" data-student-id="${id}" data-slot="${slot}">${record ? "修改時間" : "到班"}</button>${record ? `<button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${record.id}">修改點名</button>` : ""}</div></article>`;
+}
+
+function getAttendanceStudents(state, record) {
+  const season = getSeasonForDate(state, record.date);
+  const schedule = getSchedule(state, record.date, record.slot, season?.id);
+  const scheduledIds = schedule?.studentIds || [];
+  const ids = [...new Set([...scheduledIds, record.studentId])];
+  return ids.map((id) => getStudent(state, id)).filter(Boolean);
+}
+
+function closeAttendanceModal(backdrop) {
+  backdrop?.remove();
+}
+
+function openAttendanceModal(app, state, record, refresh) {
+  const students = getAttendanceStudents(state, record);
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const modal = document.createElement("section");
+  modal.className = "modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.innerHTML = `<form class="modal-form" data-attendance-form><div class="modal-head"><h3>修改點名</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label>點名學生</label><select class="select" name="studentId">${students.map((student) => `<option value="${student.id}" ${student.id === record.studentId ? "selected" : ""}>${student.name}（${student.grade} 年級）</option>`).join("")}</select></div><div class="field"><label>到班時間</label><input class="input" name="arrivalTime" type="time" required value="${record.arrivalTime || ""}" /></div><div class="field"><label>點名日期</label><input class="input" type="date" disabled value="${record.date}" /></div></div><div class="form-actions"><button class="button-danger" type="button" data-remove-attendance>刪除這筆點名</button><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit">儲存修改</button></div></form>`;
+  backdrop.append(modal);
+  app.append(backdrop);
+  const form = modal.querySelector("[data-attendance-form]");
+  const close = () => closeAttendanceModal(backdrop);
+  modal.querySelector("[data-close-modal]").addEventListener("click", close);
+  modal.querySelector("[data-cancel]").addEventListener("click", close);
+  backdrop.addEventListener("click", (event) => { if (event.target === backdrop) close(); });
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const result = updateAttendance(state, record.id, { studentId: form.elements.studentId.value, arrivalTime: form.elements.arrivalTime.value });
+    if (!result.ok) { window.alert(result.message); return; }
+    close();
+    refresh();
+  });
+  modal.querySelector("[data-remove-attendance]").addEventListener("click", () => {
+    if (!window.confirm("確定要刪除這筆點名紀錄嗎？學生堂數也會扣回一堂。")) return;
+    const result = removeAttendance(state, record.id);
+    if (!result.ok) { window.alert(result.message); return; }
+    close();
+    refresh();
+  });
 }
 
 export function bindRollCall(app, state, refresh) {
@@ -60,5 +104,9 @@ export function bindRollCall(app, state, refresh) {
     if (!arrivalTime) return;
     markPresent(state, student.id, date, button.dataset.slot, arrivalTime);
     refresh();
+  }));
+  app.querySelectorAll('[data-action="edit-attendance"]').forEach((button) => button.addEventListener("click", () => {
+    const record = state.attendance.find((item) => item.id === button.dataset.attendanceId && item.type !== "leave");
+    if (record) openAttendanceModal(app, state, record, refresh);
   }));
 }

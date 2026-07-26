@@ -1,7 +1,9 @@
 export { app } from "./app.js";
 export { auth, provider } from "./auth.js";
 export {
+  ALLOWED_EMAIL,
   getCurrentUser,
+  isAuthorizedUser,
   signInWithGoogle,
   signOut,
   subscribeToAuthState,

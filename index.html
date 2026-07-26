@@ -11,33 +11,56 @@
     <link rel="stylesheet" href="./css/style.css" />
   </head>
   <body>
-    <header class="app-header">
-      <div class="brand">
-        <span class="brand-mark">MPM</span>
-        <div>
-          <p class="eyebrow">數學課程管理</p>
-          <h1>點名系統</h1>
-        </div>
-      </div>
-      <div class="header-actions">
-        <span class="storage-status">本機測試模式</span>
-        <button class="icon-button" id="theme-toggle" type="button" aria-label="切換深色模式">深</button>
-      </div>
-    </header>
-
-    <main class="app-shell">
-      <nav class="tab-bar" aria-label="主要功能">
-        <button class="tab is-active" data-route="roll-call" type="button">今日點名</button>
-        <button class="tab" data-route="students" type="button">學生</button>
-        <button class="tab" data-route="schedule" type="button">排課</button>
-        <button class="tab" data-route="records" type="button">紀錄</button>
-        <button class="tab" data-route="payment" type="button">繳費</button>
-      </nav>
-
-      <section id="app" aria-live="polite"></section>
+    <main class="auth-gate" id="auth-gate" aria-busy="true" aria-live="polite">
+      <section class="auth-card" aria-labelledby="auth-title">
+        <span class="brand-mark" aria-hidden="true">MPM</span>
+        <p class="eyebrow">數學課程管理</p>
+        <h1 id="auth-title" tabindex="-1">正在確認登入狀態…</h1>
+        <p class="auth-message" id="auth-message">請稍候。</p>
+        <button class="button-primary auth-button" id="google-sign-in" type="button" hidden>使用 Google 登入</button>
+      </section>
     </main>
 
-    <div id="toast" class="toast" role="status"></div>
+    <div id="management-system" hidden>
+      <header class="app-header">
+        <div class="brand">
+          <span class="brand-mark">MPM</span>
+          <div>
+            <p class="eyebrow">數學課程管理</p>
+            <h1>點名系統</h1>
+          </div>
+        </div>
+        <div class="header-actions">
+          <span class="storage-status">本機測試模式</span>
+          <button class="button-secondary sign-out-button" id="sign-out" type="button">登出</button>
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="切換深色模式">深</button>
+        </div>
+      </header>
+
+      <main class="app-shell">
+        <nav class="tab-bar" aria-label="主要功能">
+          <button class="tab is-active" data-route="roll-call" type="button">今日點名</button>
+          <button class="tab" data-route="students" type="button">學生</button>
+          <button class="tab" data-route="schedule" type="button">排課</button>
+          <button class="tab" data-route="records" type="button">紀錄</button>
+          <button class="tab" data-route="payment" type="button">繳費</button>
+        </nav>
+
+        <section id="app" aria-live="polite"></section>
+      </main>
+
+      <div id="toast" class="toast" role="status"></div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "firebase/app": "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js",
+          "firebase/auth": "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js",
+          "firebase/firestore": "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js"
+        }
+      }
+    </script>
     <script type="module" src="./js/app.js"></script>
   </body>
 </html>

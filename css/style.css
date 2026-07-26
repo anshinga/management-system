@@ -15,6 +15,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 html { min-width: 320px; }
 body {
   margin: 0;
@@ -25,6 +26,28 @@ body {
 }
 button, input, select { font: inherit; }
 button { cursor: pointer; }
+.auth-gate {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+}
+.auth-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  max-width: 420px;
+  padding: 32px;
+  text-align: center;
+  width: 100%;
+}
+.auth-card .brand-mark { margin: 0 auto 16px; }
+.auth-card .eyebrow { margin-bottom: 6px; }
+.auth-card h1 { margin-bottom: 10px; }
+.auth-message { color: var(--muted); margin-bottom: 22px; }
+.auth-message.is-error { color: var(--danger); }
+.auth-button { width: 100%; }
 .app-header {
   align-items: center;
   background: var(--surface);
@@ -54,6 +77,7 @@ h2 { font-size: clamp(22px, 4vw, 30px); margin-bottom: 6px; }
 h3 { font-size: 18px; margin-bottom: 2px; }
 .header-actions { gap: 14px; }
 .storage-status { color: var(--muted); font-size: 12px; }
+.sign-out-button { padding: 6px 11px; white-space: nowrap; }
 .icon-button, .round-button {
   background: transparent;
   border: 1px solid var(--line);
@@ -224,6 +248,8 @@ body.dark { --bg: #1d1e1b; --surface: #282925; --surface-alt: #22231f; --text: #
 body.dark .student-card.is-present { background: #283b2d; border-color: #53755b; }
 body.dark .schedule-student.is-present { background: #283b2d; border-color: #53755b; color: var(--success); }
 @media (max-width: 720px) {
+  .auth-gate { padding: 16px; }
+  .auth-card { padding: 24px 18px; }
   .app-header { padding: 14px 16px; }
   .app-shell { padding: 18px 14px 50px; }
   .storage-status { display: none; }

@@ -1,0 +1,10 @@
+{
+  "name": "management-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MPM 點名系統",
+  "type": "module",
+  "dependencies": {
+    "firebase": "^12.16.0"
+  }
+}

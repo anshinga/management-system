@@ -140,7 +140,7 @@ service cloud.firestore {
 
     function validStudent(data) {
       return data.keys().hasAll(["name", "grade", "currentLessonCount", "currentTerm", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
-        && data.keys().hasOnly(["name", "grade", "currentLessonCount", "currentTerm", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["name", "grade", "currentLessonCount", "currentTerm", "previousLessonDate", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 100
@@ -152,6 +152,16 @@ service cloud.firestore {
         && data.currentLessonCount <= 23
         && data.currentTerm is int
         && data.currentTerm >= 1
+        && (
+          !data.keys().hasAny(["previousLessonDate"])
+          || (
+            data.previousLessonDate is string
+            && (
+              data.previousLessonDate == ""
+              || isDateKey(data.previousLessonDate)
+            )
+          )
+        )
         && data.status in ["active", "paused"]
         && data.pendingPaymentCount is int
         && data.pendingPaymentCount >= 0

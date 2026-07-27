@@ -1,6 +1,23 @@
 import { escapeHtml } from "../ui/html.js";
 
+function renderAttendanceRecord(item) {
+  return `<div class="record-item"><span class="record-date">${escapeHtml(item.dateKey)}</span><span class="record-lesson">第 ${item.term} 期・第 ${item.lessonNumber} 堂</span></div>`;
+}
+
+function renderPreviousLesson(student) {
+  if (!student.previousLessonDate) return "";
+  return `<div class="record-item is-baseline"><span class="record-date">${escapeHtml(student.previousLessonDate)}</span><span class="record-lesson">上一次上課・舊資料起點</span></div>`;
+}
+
 export function renderRecords(state) {
-  const records = [...state.students].sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name)).map((student) => { const history = state.attendance.filter((item) => item.studentId === student.id).sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.arrivalTime.localeCompare(b.arrivalTime)); return `<div class="record-row"><div class="record-meta"><span class="grade-badge">${student.grade} 年級</span><strong>${escapeHtml(student.name)}</strong></div><div class="record-history">${history.length ? history.map((item) => `<div class="record-item"><span class="record-date">${escapeHtml(item.dateKey)}</span><span class="record-lesson">第 ${item.term} 期・第 ${item.lessonNumber} 堂</span></div>`).join("") : '<span class="student-subtitle">尚無點名紀錄</span>'}</div></div>`; });
+  const records = [...state.students]
+    .sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name))
+    .map((student) => {
+      const history = state.attendance
+        .filter((item) => item.studentId === student.id)
+        .sort((a, b) => a.dateKey.localeCompare(b.dateKey) || a.arrivalTime.localeCompare(b.arrivalTime));
+      const historyItems = `${renderPreviousLesson(student)}${history.map(renderAttendanceRecord).join("")}`;
+      return `<div class="record-row"><div class="record-meta"><span class="grade-badge">${student.grade} 年級</span><strong>${escapeHtml(student.name)}</strong></div><div class="record-history">${historyItems || '<span class="student-subtitle">尚無點名紀錄</span>'}</div></div>`;
+    });
   return `<div class="page-head"><div><p class="eyebrow">歷史出席</p><h2>紀錄</h2><p>每位學生一列，橫向查看日期與堂數。</p></div></div><div class="record-list">${records.join("")}</div>`;
 }

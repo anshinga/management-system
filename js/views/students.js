@@ -1,21 +1,39 @@
 import { createStudent, updateStudent } from "../repositories/students-repository.js";
-import { getStudent } from "../store.js";
+import { getStudent, getTodayDate } from "../store.js";
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
 
 const defaultGrades = Array.from({ length: 12 }, (_, index) => index + 1);
+const defaultSort = "grade";
 
 function getGradeOptions(state) {
   return [...new Set([...defaultGrades, ...state.students.map((student) => Number(student.grade)).filter(Number.isFinite)])].sort((a, b) => a - b);
 }
 
+export function sortStudents(students, sort = defaultSort) {
+  const compareName = (a, b) => a.name.localeCompare(b.name);
+  return [...students].sort((a, b) => {
+    if (sort === "lessons-desc") {
+      return b.currentLessonCount - a.currentLessonCount || a.grade - b.grade || compareName(a, b);
+    }
+    if (sort === "lessons-asc") {
+      return a.currentLessonCount - b.currentLessonCount || a.grade - b.grade || compareName(a, b);
+    }
+    return a.grade - b.grade || compareName(a, b);
+  });
+}
+
 export function renderStudents(state, filters = {}) {
   const search = filters.search || "";
   const grade = filters.grade || "all";
+  const sort = filters.sort || defaultSort;
   const grades = getGradeOptions(state);
-  const students = state.students.filter((student) => (!search || student.name.includes(search)) && (grade === "all" || String(student.grade) === grade));
+  const students = sortStudents(
+    state.students.filter((student) => (!search || student.name.includes(search)) && (grade === "all" || String(student.grade) === grade)),
+    sort,
+  );
   return `<div class="page-head"><div><p class="eyebrow">名冊管理</p><h2>學生</h2><p>共 ${state.students.length} 位學生，變更會即時同步。</p></div><button class="button-primary" data-action="toggle-student-form">新增學生</button></div>
-    <div class="toolbar"><div class="toolbar-start"><input class="input" id="student-search" value="${escapeAttribute(search)}" placeholder="搜尋姓名" /><select class="select" id="grade-filter"><option value="all">全部年級</option>${grades.map((item) => `<option value="${item}" ${String(item) === grade ? "selected" : ""}>${item} 年級</option>`).join("")}</select></div></div>
+    <div class="toolbar"><div class="toolbar-start"><input class="input" id="student-search" value="${escapeAttribute(search)}" placeholder="搜尋姓名" /><select class="select" id="grade-filter"><option value="all">全部年級</option>${grades.map((item) => `<option value="${item}" ${String(item) === grade ? "selected" : ""}>${item} 年級</option>`).join("")}</select><select class="select" id="student-sort" aria-label="學生排序方式"><option value="grade" ${sort === "grade" ? "selected" : ""}>依年級排序</option><option value="lessons-desc" ${sort === "lessons-desc" ? "selected" : ""}>堂數：多到少</option><option value="lessons-asc" ${sort === "lessons-asc" ? "selected" : ""}>堂數：少到多</option></select></div></div>
     <div class="panel"><div class="schedule-wrap"><table class="data-table"><thead><tr><th>學生</th><th>年級</th><th>堂數</th><th>期數</th><th>狀態</th><th>操作</th></tr></thead><tbody>${students.length ? students.map(renderRow).join("") : '<tr><td colspan="6" class="empty">找不到符合條件的學生。</td></tr>'}</tbody></table></div></div>`;
 }
 
@@ -26,9 +44,18 @@ function renderRow(student) {
 export function bindStudents(app, state, refresh, showToast) {
   const search = app.querySelector("#student-search");
   const grade = app.querySelector("#grade-filter");
-  const rerender = () => { app.innerHTML = renderStudents(state, { search: search.value, grade: grade.value }); bindStudents(app, state, refresh, showToast); };
+  const sort = app.querySelector("#student-sort");
+  const rerender = () => {
+    app.innerHTML = renderStudents(state, {
+      search: search.value,
+      grade: grade.value,
+      sort: sort.value,
+    });
+    bindStudents(app, state, refresh, showToast);
+  };
   search?.addEventListener("input", rerender);
   grade?.addEventListener("change", rerender);
+  sort?.addEventListener("change", rerender);
   app.querySelector('[data-action="toggle-student-form"]')?.addEventListener("click", () => showStudentForm(app, state, refresh, showToast));
   app.querySelectorAll('[data-action="edit-student"]').forEach((button) => button.addEventListener("click", () => showStudentForm(app, state, refresh, showToast, getStudent(state, button.dataset.studentId))));
 }
@@ -43,7 +70,7 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
   modal.setAttribute("aria-labelledby", "student-modal-title");
   const form = document.createElement("form");
   form.className = "modal-form";
-  form.innerHTML = `<div class="modal-head"><h3 id="student-modal-title">${student ? "編輯學生" : "新增學生"}</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label>姓名</label><input class="input" name="name" required maxlength="100" value="${escapeAttribute(student?.name || "")}" /></div><div class="field"><label>年級</label><input class="input" name="grade" type="number" min="1" max="20" required value="${student?.grade ?? 1}" /></div><div class="field"><label>目前堂數</label><input class="input" name="currentLessonCount" type="number" min="0" max="23" required value="${student?.currentLessonCount ?? 0}" /></div><div class="field"><label>目前期數</label><input class="input" name="currentTerm" type="number" min="1" required value="${student?.currentTerm ?? 1}" /></div></div><div class="form-actions"><button class="button-primary" type="submit">儲存</button><button class="button-secondary" type="button" data-cancel>取消</button></div>`;
+  form.innerHTML = `<div class="modal-head"><h3 id="student-modal-title">${student ? "編輯學生" : "新增學生"}</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label>姓名</label><input class="input" name="name" required maxlength="100" value="${escapeAttribute(student?.name || "")}" /></div><div class="field"><label>年級</label><input class="input" name="grade" type="number" min="1" max="20" required value="${student?.grade ?? 1}" /></div><div class="field"><label>目前堂數</label><input class="input" name="currentLessonCount" type="number" min="0" max="23" required value="${student?.currentLessonCount ?? 0}" /></div><div class="field"><label>目前期數</label><input class="input" name="currentTerm" type="number" min="1" required value="${student?.currentTerm ?? 1}" /></div><div class="field"><label>上一次上課日期（選填）</label><input class="input" name="previousLessonDate" type="date" max="${getTodayDate()}" value="${escapeAttribute(student?.previousLessonDate || "")}" /><small class="student-subtitle">僅作為舊資料起點，不會建立或修改點名紀錄。</small></div></div><div class="form-actions"><button class="button-primary" type="submit">儲存</button><button class="button-secondary" type="button" data-cancel>取消</button></div>`;
   modal.append(form);
   backdrop.append(modal);
   app.append(backdrop);
@@ -64,6 +91,7 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
       grade: Number(data.get("grade")),
       currentLessonCount: Number(data.get("currentLessonCount")),
       currentTerm: Number(data.get("currentTerm")),
+      previousLessonDate: data.get("previousLessonDate"),
       status: student?.status || "active",
       pendingPaymentCount: student?.pendingPaymentCount || 0,
       paymentPending: Boolean(student?.paymentPending),

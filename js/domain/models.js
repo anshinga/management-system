@@ -12,6 +12,7 @@ export function normalizeStudentInput(input = {}) {
     grade: Number(input.grade),
     currentLessonCount: Number(input.currentLessonCount ?? input.lessonCount ?? 0),
     currentTerm: Number(input.currentTerm ?? input.term ?? 1),
+    previousLessonDate: normalizeText(input.previousLessonDate),
     status: STUDENT_STATUSES.includes(input.status) ? input.status : "active",
     pendingPaymentCount: Number(input.pendingPaymentCount ?? 0),
     paymentPending: Boolean(input.paymentPending),

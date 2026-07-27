@@ -4,7 +4,7 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { normalizeStudentInput } from "../domain/models.js";
+import { isDateKey, normalizeStudentInput } from "../domain/models.js";
 import { COLLECTIONS, workspaceCollectionRef, workspaceDocumentRef } from "./firestore-paths.js";
 
 function validateStudent(student) {
@@ -17,6 +17,9 @@ function validateStudent(student) {
   }
   if (!Number.isInteger(student.currentTerm) || student.currentTerm < 1) {
     throw new Error("期數必須是大於 0 的整數。");
+  }
+  if (student.previousLessonDate && !isDateKey(student.previousLessonDate)) {
+    throw new Error("上一次上課日期必須是有效日期。");
   }
   if (!Number.isInteger(student.pendingPaymentCount) || student.pendingPaymentCount < 0) {
     throw new Error("待付款期數不可小於 0。");

@@ -131,6 +131,33 @@ describe("Firestore Security Rules", () => {
     }));
   });
 
+  test("owner 可以保存合法的上一次上課日期，且不能保存錯誤格式", async () => {
+    const database = testEnvironment.authenticatedContext("owner-uid", {
+      email: OWNER_EMAIL,
+      email_verified: true,
+    }).firestore();
+    const student = workspaceDocument(database, "students", "student-1");
+    await assertSucceeds(updateDoc(student, {
+      previousLessonDate: "2026-07-20",
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(student, {
+      previousLessonDate: "2026/07/20",
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
+  test("teacher 不能透過學生歷史起點修改正式資料欄位", async () => {
+    const database = testEnvironment.authenticatedContext("teacher-uid", {
+      email: "teacher@example.com",
+      email_verified: true,
+    }).firestore();
+    await assertFails(updateDoc(workspaceDocument(database, "students", "student-1"), {
+      previousLessonDate: "2026-07-20",
+      updatedAt: serverTimestamp(),
+    }));
+  });
+
   test("teacher 可以排課但不能建立付款紀錄", async () => {
     const database = testEnvironment.authenticatedContext("teacher-uid", {
       email: "teacher@example.com",

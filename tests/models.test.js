@@ -19,10 +19,21 @@ describe("domain models", () => {
       grade: 5,
       currentLessonCount: 8,
       currentTerm: 2,
+      previousLessonDate: "",
       status: "active",
       pendingPaymentCount: 0,
       paymentPending: false,
     });
+  });
+
+  test("舊資料的上一次上課日期會保留為學生欄位", () => {
+    expect(normalizeStudentInput({
+      name: "王小明",
+      grade: 5,
+      currentLessonCount: 8,
+      currentTerm: 2,
+      previousLessonDate: " 2026-07-20 ",
+    }).previousLessonDate).toBe("2026-07-20");
   });
 
   test("付款輸入會正規化", () => {

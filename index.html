@@ -31,7 +31,7 @@
           </div>
         </div>
         <div class="header-actions">
-          <span class="storage-status">本機測試模式</span>
+          <span class="storage-status" id="storage-status">尚未連線</span>
           <button class="button-secondary sign-out-button" id="sign-out" type="button">登出</button>
           <button class="icon-button" id="theme-toggle" type="button" aria-label="切換深色模式">深</button>
         </div>
@@ -52,15 +52,6 @@
       <div id="toast" class="toast" role="status"></div>
     </div>
 
-    <script type="importmap">
-      {
-        "imports": {
-          "firebase/app": "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js",
-          "firebase/auth": "https://www.gstatic.com/firebasejs/12.16.0/firebase-auth.js",
-          "firebase/firestore": "https://www.gstatic.com/firebasejs/12.16.0/firebase-firestore.js"
-        }
-      }
-    </script>
     <script type="module" src="./js/app.js"></script>
   </body>
 </html>

@@ -1,4 +1,7 @@
-import { getStudent, makeId, saveState } from "../store.js";
+import { createStudent, updateStudent } from "../repositories/students-repository.js";
+import { getStudent } from "../store.js";
+import { escapeAttribute, escapeHtml } from "../ui/html.js";
+import { getUserErrorMessage } from "../ui/errors.js";
 
 const defaultGrades = Array.from({ length: 12 }, (_, index) => index + 1);
 
@@ -11,13 +14,13 @@ export function renderStudents(state, filters = {}) {
   const grade = filters.grade || "all";
   const grades = getGradeOptions(state);
   const students = state.students.filter((student) => (!search || student.name.includes(search)) && (grade === "all" || String(student.grade) === grade));
-  return `<div class="page-head"><div><p class="eyebrow">名冊管理</p><h2>學生</h2><p>共 ${state.students.length} 位學生，可直接新增或編輯。</p></div><button class="button-primary" data-action="toggle-student-form">新增學生</button></div>
-    <div class="toolbar"><div class="toolbar-start"><input class="input" id="student-search" value="${search}" placeholder="搜尋姓名" /><select class="select" id="grade-filter"><option value="all">全部年級</option>${grades.map((item) => `<option value="${item}" ${String(item) === grade ? "selected" : ""}>${item} 年級</option>`).join("")}</select></div><div class="toolbar-end"><button class="button-secondary" data-action="reset-demo">重設示範資料</button></div></div>
+  return `<div class="page-head"><div><p class="eyebrow">名冊管理</p><h2>學生</h2><p>共 ${state.students.length} 位學生，變更會即時同步。</p></div><button class="button-primary" data-action="toggle-student-form">新增學生</button></div>
+    <div class="toolbar"><div class="toolbar-start"><input class="input" id="student-search" value="${escapeAttribute(search)}" placeholder="搜尋姓名" /><select class="select" id="grade-filter"><option value="all">全部年級</option>${grades.map((item) => `<option value="${item}" ${String(item) === grade ? "selected" : ""}>${item} 年級</option>`).join("")}</select></div></div>
     <div class="panel"><div class="schedule-wrap"><table class="data-table"><thead><tr><th>學生</th><th>年級</th><th>堂數</th><th>期數</th><th>狀態</th><th>操作</th></tr></thead><tbody>${students.length ? students.map(renderRow).join("") : '<tr><td colspan="6" class="empty">找不到符合條件的學生。</td></tr>'}</tbody></table></div></div>`;
 }
 
 function renderRow(student) {
-  return `<tr><td><strong>${student.name}</strong>${student.paymentPending ? ' <span class="pending-badge">待繳費</span>' : ""}</td><td>${student.grade} 年級</td><td>${student.lessonCount} / 24</td><td>第 ${student.term} 期</td><td><span class="status-badge ${student.status}">${student.status === "active" ? "在讀" : "停課"}</span></td><td><button class="button-secondary" data-action="edit-student" data-student-id="${student.id}">編輯</button></td></tr>`;
+  return `<tr><td><strong>${escapeHtml(student.name)}</strong>${student.paymentPending ? ` <span class="pending-badge">${student.pendingPaymentCount} 期待付款</span>` : ""}</td><td>${student.grade} 年級</td><td>${student.currentLessonCount} / 24</td><td>第 ${student.currentTerm} 期</td><td><span class="status-badge ${student.status}">${student.status === "active" ? "在讀" : "停課"}</span></td><td><button class="button-secondary" data-action="edit-student" data-student-id="${escapeAttribute(student.id)}">編輯</button></td></tr>`;
 }
 
 export function bindStudents(app, state, refresh, showToast) {
@@ -28,7 +31,6 @@ export function bindStudents(app, state, refresh, showToast) {
   grade?.addEventListener("change", rerender);
   app.querySelector('[data-action="toggle-student-form"]')?.addEventListener("click", () => showStudentForm(app, state, refresh, showToast));
   app.querySelectorAll('[data-action="edit-student"]').forEach((button) => button.addEventListener("click", () => showStudentForm(app, state, refresh, showToast, getStudent(state, button.dataset.studentId))));
-  app.querySelector('[data-action="reset-demo"]')?.addEventListener("click", () => { localStorage.removeItem("mpm-attendance-prototype-v1"); refresh(); showToast("已重設示範資料"); });
 }
 
 function showStudentForm(app, state, refresh, showToast, student = null) {
@@ -41,7 +43,7 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
   modal.setAttribute("aria-labelledby", "student-modal-title");
   const form = document.createElement("form");
   form.className = "modal-form";
-  form.innerHTML = `<div class="modal-head"><h3 id="student-modal-title">${student ? "編輯學生" : "新增學生"}</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label>姓名</label><input class="input" name="name" required value="${student?.name || ""}" /></div><div class="field"><label>年級</label><input class="input" name="grade" type="number" min="1" value="${student?.grade ?? 1}" /></div><div class="field"><label>目前堂數</label><input class="input" name="lessonCount" type="number" min="0" max="24" value="${student?.lessonCount ?? 0}" /></div><div class="field"><label>期數</label><input class="input" name="term" type="number" min="1" value="${student?.term ?? 1}" /></div></div><div class="form-actions"><button class="button-primary" type="submit">儲存</button><button class="button-secondary" type="button" data-cancel>取消</button></div>`;
+  form.innerHTML = `<div class="modal-head"><h3 id="student-modal-title">${student ? "編輯學生" : "新增學生"}</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label>姓名</label><input class="input" name="name" required maxlength="100" value="${escapeAttribute(student?.name || "")}" /></div><div class="field"><label>年級</label><input class="input" name="grade" type="number" min="1" max="20" required value="${student?.grade ?? 1}" /></div><div class="field"><label>目前堂數</label><input class="input" name="currentLessonCount" type="number" min="0" max="23" required value="${student?.currentLessonCount ?? 0}" /></div><div class="field"><label>目前期數</label><input class="input" name="currentTerm" type="number" min="1" required value="${student?.currentTerm ?? 1}" /></div></div><div class="form-actions"><button class="button-primary" type="submit">儲存</button><button class="button-secondary" type="button" data-cancel>取消</button></div>`;
   modal.append(form);
   backdrop.append(modal);
   app.append(backdrop);
@@ -51,6 +53,30 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
   modal.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
   form.querySelector("[data-close-modal]").addEventListener("click", closeModal);
   form.querySelector("[data-cancel]").addEventListener("click", closeModal);
-  form.addEventListener("submit", (event) => { event.preventDefault(); const data = new FormData(form); const target = student || { id: makeId("student"), status: "active", paymentPending: false }; Object.assign(target, { name: data.get("name"), grade: Number(data.get("grade")), lessonCount: Number(data.get("lessonCount")), term: Number(data.get("term")) }); if (!student) state.students.push(target); saveState(state); closeModal(); refresh(); showToast(student ? "學生資料已更新" : "學生已新增"); });
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const submitButton = form.querySelector('[type="submit"]');
+    submitButton.disabled = true;
+    const data = new FormData(form);
+    const input = {
+      ...(student || {}),
+      name: data.get("name"),
+      grade: Number(data.get("grade")),
+      currentLessonCount: Number(data.get("currentLessonCount")),
+      currentTerm: Number(data.get("currentTerm")),
+      status: student?.status || "active",
+      pendingPaymentCount: student?.pendingPaymentCount || 0,
+      paymentPending: Boolean(student?.paymentPending),
+    };
+    try {
+      if (student) await updateStudent(student.id, input);
+      else await createStudent(input);
+      closeModal();
+      showToast(student ? "學生資料已更新" : "學生已新增");
+    } catch (error) {
+      submitButton.disabled = false;
+      showToast(getUserErrorMessage(error, "學生資料儲存失敗"));
+    }
+  });
   form.querySelector('[name="name"]')?.focus();
 }

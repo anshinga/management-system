@@ -2,14 +2,473 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthorizedUser() {
+    function isSignedIn() {
       return request.auth != null
-        && request.auth.token.email_verified == true
+        && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrapOwner() {
+      return isSignedIn()
         && request.auth.token.email == "anshinga79@gmail.com";
     }
 
+    function isExpectedWorkspace(workspaceId) {
+      return workspaceId == "mpm-main";
+    }
+
+    function memberPath(workspaceId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid);
+    }
+
+    function studentPath(workspaceId, studentId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/students/$(studentId);
+    }
+
+    function billingCyclePath(workspaceId, billingCycleId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/billingCycles/$(billingCycleId);
+    }
+
+    function paymentPath(workspaceId, paymentId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/payments/$(paymentId);
+    }
+
+    function isSafeDocumentId(value) {
+      return value is string
+        && value.size() > 0
+        && value.size() <= 150
+        && value.matches("^[A-Za-z0-9_-]+$");
+    }
+
+    function encodedTime(value) {
+      return value[0:2] + "%3A" + value[3:5];
+    }
+
+    function scheduleEntryId(data) {
+      return data.dateKey + "__" + encodedTime(data.slot) + "__" + data.studentId;
+    }
+
+    function scheduleOverrideId(data) {
+      return data.weekStart
+        + "__" + data.seasonId
+        + "__" + data.studentId
+        + "__" + string(data.sourceWeekday)
+        + "__" + encodedTime(data.sourceSlot);
+    }
+
+    function expectedAttendanceId(data) {
+      return data.dateKey + "__" + encodedTime(data.slot) + "__" + data.studentId;
+    }
+
+    function expectedBillingCycleId(data) {
+      return data.studentId + "__" + string(data.term);
+    }
+
+    function hasActiveMembership(workspaceId) {
+      return isSignedIn()
+        && exists(memberPath(workspaceId))
+        && get(memberPath(workspaceId)).data.active == true;
+    }
+
+    function hasRole(workspaceId, roles) {
+      return hasActiveMembership(workspaceId)
+        && get(memberPath(workspaceId)).data.role in roles;
+    }
+
+    function canRead(workspaceId) {
+      return isExpectedWorkspace(workspaceId)
+        && (isBootstrapOwner() || hasActiveMembership(workspaceId));
+    }
+
+    function isOwner(workspaceId) {
+      return isExpectedWorkspace(workspaceId)
+        && (isBootstrapOwner() || hasRole(workspaceId, ["owner"]));
+    }
+
+    function canTeach(workspaceId) {
+      return isExpectedWorkspace(workspaceId)
+        && (isBootstrapOwner() || hasRole(workspaceId, ["owner", "teacher"]));
+    }
+
+    function hasCreateTimestamps(data) {
+      return data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.createdAt == request.time
+        && data.updatedAt == request.time;
+    }
+
+    function hasUpdateTimestamps(data) {
+      return data.createdAt == resource.data.createdAt
+        && data.updatedAt is timestamp
+        && data.updatedAt == request.time;
+    }
+
+    function isDateKey(value) {
+      return value is string
+        && value.matches("^\\d{4}-\\d{2}-\\d{2}$");
+    }
+
+    function isTimeValue(value) {
+      return value is string
+        && value.matches("^([01]\\d|2[0-3]):[0-5]\\d$");
+    }
+
+    function validWorkspace(data) {
+      return data.keys().hasAll(["name", "timezone", "schemaVersion", "lastGradePromotionYear", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["name", "timezone", "schemaVersion", "lastGradePromotionYear", "createdAt", "updatedAt"])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 100
+        && data.timezone == "Asia/Taipei"
+        && data.schemaVersion is int
+        && data.schemaVersion >= 1
+        && data.lastGradePromotionYear is int
+        && data.lastGradePromotionYear >= 2025;
+    }
+
+    function validMember(data) {
+      return data.keys().hasAll(["email", "name", "role", "active", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["email", "name", "role", "active", "createdAt", "updatedAt"])
+        && data.email is string
+        && data.email.size() > 3
+        && data.email.size() <= 254
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 100
+        && data.role in ["owner", "teacher", "viewer"]
+        && data.active is bool;
+    }
+
+    function validStudent(data) {
+      return data.keys().hasAll(["name", "grade", "currentLessonCount", "currentTerm", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["name", "grade", "currentLessonCount", "currentTerm", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 100
+        && data.grade is int
+        && data.grade >= 1
+        && data.grade <= 20
+        && data.currentLessonCount is int
+        && data.currentLessonCount >= 0
+        && data.currentLessonCount <= 23
+        && data.currentTerm is int
+        && data.currentTerm >= 1
+        && data.status in ["active", "paused"]
+        && data.pendingPaymentCount is int
+        && data.pendingPaymentCount >= 0
+        && data.paymentPending is bool
+        && data.paymentPending == (data.pendingPaymentCount > 0);
+    }
+
+    function validTeacherProgressUpdate() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly(["currentLessonCount", "currentTerm", "pendingPaymentCount", "paymentPending", "updatedAt"])
+        && (
+          (
+            request.resource.data.currentTerm == resource.data.currentTerm
+            && request.resource.data.pendingPaymentCount == resource.data.pendingPaymentCount
+            && request.resource.data.paymentPending == resource.data.paymentPending
+            && (
+              request.resource.data.currentLessonCount == resource.data.currentLessonCount + 1
+              || (
+                resource.data.currentLessonCount > 0
+                && request.resource.data.currentLessonCount == resource.data.currentLessonCount - 1
+              )
+            )
+          )
+          || (
+            resource.data.currentLessonCount == 23
+            && request.resource.data.currentLessonCount == 0
+            && request.resource.data.currentTerm == resource.data.currentTerm + 1
+            && request.resource.data.pendingPaymentCount == resource.data.pendingPaymentCount + 1
+            && request.resource.data.paymentPending == true
+          )
+        );
+    }
+
+    function validSeason(data) {
+      return data.keys().hasAll(["name", "startDate", "endDate", "active", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["name", "startDate", "endDate", "active", "createdAt", "updatedAt"])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 100
+        && isDateKey(data.startDate)
+        && isDateKey(data.endDate)
+        && data.startDate <= data.endDate
+        && data.active is bool;
+    }
+
+    function validScheduleEntry(data) {
+      return data.keys().hasAll(["studentId", "seasonId", "dateKey", "slot", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "seasonId", "dateKey", "slot", "createdAt", "updatedAt"])
+        && isSafeDocumentId(data.studentId)
+        && isSafeDocumentId(data.seasonId)
+        && isDateKey(data.dateKey)
+        && isTimeValue(data.slot);
+    }
+
+    function validScheduleOverride(data) {
+      return data.keys().hasAll(["studentId", "seasonId", "weekStart", "sourceWeekday", "sourceSlot", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "seasonId", "weekStart", "sourceWeekday", "sourceSlot", "createdAt", "updatedAt"])
+        && isSafeDocumentId(data.studentId)
+        && isSafeDocumentId(data.seasonId)
+        && isDateKey(data.weekStart)
+        && data.sourceWeekday is int
+        && data.sourceWeekday >= 1
+        && data.sourceWeekday <= 7
+        && isTimeValue(data.sourceSlot);
+    }
+
+    function validAttendance(data) {
+      return data.keys().hasAll(["studentId", "dateKey", "slot", "arrivalTime", "lessonNumber", "term", "recordedBy", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "dateKey", "slot", "arrivalTime", "lessonNumber", "term", "recordedBy", "createdAt", "updatedAt"])
+        && isSafeDocumentId(data.studentId)
+        && isDateKey(data.dateKey)
+        && isTimeValue(data.slot)
+        && isTimeValue(data.arrivalTime)
+        && data.lessonNumber is int
+        && data.lessonNumber >= 1
+        && data.lessonNumber <= 24
+        && data.term is int
+        && data.term >= 1
+        && data.recordedBy is string
+        && data.recordedBy.size() > 0;
+    }
+
+    function validBillingCycle(data) {
+      return data.keys().hasAll(["studentId", "term", "status", "paymentId", "completedAt", "paidAt", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "term", "status", "paymentId", "completedAt", "paidAt", "createdAt", "updatedAt"])
+        && isSafeDocumentId(data.studentId)
+        && data.term is int
+        && data.term >= 1
+        && data.status in ["pending", "paid"]
+        && data.paymentId is string
+        && data.completedAt is timestamp
+        && (data.paidAt == null || data.paidAt is timestamp)
+        && (
+          (data.status == "pending" && data.paymentId == "" && data.paidAt == null)
+          || (data.status == "paid" && data.paymentId.size() > 0 && data.paidAt is timestamp)
+        );
+    }
+
+    function validPayment(data) {
+      return data.keys().hasAll(["billingCycleId", "studentId", "term", "amount", "method", "paidDate", "note", "confirmedBy", "createdAt"])
+        && data.keys().hasOnly(["billingCycleId", "studentId", "term", "amount", "method", "paidDate", "note", "confirmedBy", "createdAt"])
+        && data.billingCycleId is string
+        && data.billingCycleId.size() > 0
+        && isSafeDocumentId(data.studentId)
+        && data.term is int
+        && data.term >= 1
+        && data.amount is number
+        && data.amount >= 0
+        && data.method in ["cash", "transfer", "card", "other"]
+        && isDateKey(data.paidDate)
+        && data.note is string
+        && data.note.size() <= 500
+        && data.confirmedBy is string
+        && data.confirmedBy.size() > 0
+        && data.createdAt is timestamp
+        && data.createdAt == request.time;
+    }
+
+    match /workspaces/{workspaceId} {
+      allow read: if canRead(workspaceId);
+      allow create: if isOwner(workspaceId)
+        && validWorkspace(request.resource.data)
+        && hasCreateTimestamps(request.resource.data);
+      allow update: if isOwner(workspaceId)
+        && validWorkspace(request.resource.data)
+        && hasUpdateTimestamps(request.resource.data);
+      allow delete: if false;
+
+      match /members/{memberId} {
+        allow read: if canRead(workspaceId);
+        allow create: if isOwner(workspaceId)
+          && validMember(request.resource.data)
+          && hasCreateTimestamps(request.resource.data);
+        allow update: if isOwner(workspaceId)
+          && validMember(request.resource.data)
+          && hasUpdateTimestamps(request.resource.data);
+        allow delete: if isOwner(workspaceId)
+          && memberId != request.auth.uid;
+      }
+
+      match /students/{studentId} {
+        allow read: if canRead(workspaceId);
+        allow create: if isOwner(workspaceId)
+          && isSafeDocumentId(studentId)
+          && validStudent(request.resource.data)
+          && hasCreateTimestamps(request.resource.data);
+        allow update: if validStudent(request.resource.data)
+          && hasUpdateTimestamps(request.resource.data)
+          && (
+            isOwner(workspaceId)
+            || (
+              canTeach(workspaceId)
+              && validTeacherProgressUpdate()
+            )
+          );
+        allow delete: if isOwner(workspaceId);
+      }
+
+      match /seasons/{seasonId} {
+        allow read: if canRead(workspaceId);
+        allow create: if isOwner(workspaceId)
+          && validSeason(request.resource.data)
+          && hasCreateTimestamps(request.resource.data);
+        allow update: if isOwner(workspaceId)
+          && validSeason(request.resource.data)
+          && hasUpdateTimestamps(request.resource.data);
+        allow delete: if isOwner(workspaceId);
+      }
+
+      match /scheduleEntries/{entryId} {
+        allow read: if canRead(workspaceId);
+        allow create: if canTeach(workspaceId)
+          && entryId == scheduleEntryId(request.resource.data)
+          && validScheduleEntry(request.resource.data)
+          && hasCreateTimestamps(request.resource.data);
+        allow update: if canTeach(workspaceId)
+          && entryId == scheduleEntryId(request.resource.data)
+          && validScheduleEntry(request.resource.data)
+          && hasUpdateTimestamps(request.resource.data);
+        allow delete: if canTeach(workspaceId);
+      }
+
+      match /scheduleOverrides/{overrideId} {
+        allow read: if canRead(workspaceId);
+        allow create: if canTeach(workspaceId)
+          && overrideId == scheduleOverrideId(request.resource.data)
+          && validScheduleOverride(request.resource.data)
+          && hasCreateTimestamps(request.resource.data);
+        allow update: if canTeach(workspaceId)
+          && overrideId == scheduleOverrideId(request.resource.data)
+          && validScheduleOverride(request.resource.data)
+          && hasUpdateTimestamps(request.resource.data);
+        allow delete: if canTeach(workspaceId);
+      }
+
+      match /attendance/{attendanceId} {
+        allow read: if canRead(workspaceId);
+        allow create: if canTeach(workspaceId)
+          && attendanceId == expectedAttendanceId(request.resource.data)
+          && validAttendance(request.resource.data)
+          && hasCreateTimestamps(request.resource.data)
+          && request.resource.data.recordedBy == request.auth.uid
+          && exists(studentPath(workspaceId, request.resource.data.studentId))
+          && request.resource.data.term
+            == get(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
+          && request.resource.data.lessonNumber
+            == get(studentPath(workspaceId, request.resource.data.studentId)).data.currentLessonCount + 1
+          && (
+            (
+              request.resource.data.lessonNumber < 24
+              && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
+                == request.resource.data.term
+              && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentLessonCount
+                == request.resource.data.lessonNumber
+            )
+            || (
+              request.resource.data.lessonNumber == 24
+              && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
+                == request.resource.data.term + 1
+              && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentLessonCount == 0
+              && existsAfter(billingCyclePath(
+                workspaceId,
+                expectedBillingCycleId(request.resource.data)
+              ))
+              && getAfter(billingCyclePath(
+                workspaceId,
+                expectedBillingCycleId(request.resource.data)
+              )).data.studentId == request.resource.data.studentId
+              && getAfter(billingCyclePath(
+                workspaceId,
+                expectedBillingCycleId(request.resource.data)
+              )).data.term == request.resource.data.term
+              && getAfter(billingCyclePath(
+                workspaceId,
+                expectedBillingCycleId(request.resource.data)
+              )).data.status == "pending"
+            )
+          );
+        allow update: if canTeach(workspaceId)
+          && attendanceId == expectedAttendanceId(request.resource.data)
+          && validAttendance(request.resource.data)
+          && hasUpdateTimestamps(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["arrivalTime", "updatedAt"]);
+        allow delete: if canTeach(workspaceId)
+          && resource.data.term
+            == get(studentPath(workspaceId, resource.data.studentId)).data.currentTerm
+          && resource.data.lessonNumber
+            == get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount
+          && getAfter(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount
+            == get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount - 1;
+      }
+
+      match /billingCycles/{billingCycleId} {
+        allow read: if canRead(workspaceId);
+        allow create: if canTeach(workspaceId)
+          && billingCycleId == expectedBillingCycleId(request.resource.data)
+          && validBillingCycle(request.resource.data)
+          && request.resource.data.status == "pending"
+          && hasCreateTimestamps(request.resource.data)
+          && request.resource.data.completedAt == request.time
+          && exists(studentPath(workspaceId, request.resource.data.studentId))
+          && request.resource.data.term == get(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
+          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
+            == request.resource.data.term + 1
+          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
+            == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount + 1
+          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending == true;
+        allow update: if isOwner(workspaceId)
+          && billingCycleId == expectedBillingCycleId(request.resource.data)
+          && validBillingCycle(request.resource.data)
+          && resource.data.status == "pending"
+          && request.resource.data.status == "paid"
+          && request.resource.data.createdAt == resource.data.createdAt
+          && request.resource.data.completedAt == resource.data.completedAt
+          && request.resource.data.updatedAt == request.time
+          && request.resource.data.paidAt == request.time
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["status", "paymentId", "paidAt", "updatedAt"])
+          && existsAfter(paymentPath(workspaceId, request.resource.data.paymentId))
+          && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.billingCycleId == billingCycleId
+          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
+            == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount - 1
+          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending
+            == (getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount > 0);
+        allow delete: if false;
+      }
+
+      match /payments/{paymentId} {
+        allow read: if canRead(workspaceId);
+        allow create: if isOwner(workspaceId)
+          && validPayment(request.resource.data)
+          && request.resource.data.confirmedBy == request.auth.uid
+          && exists(billingCyclePath(workspaceId, request.resource.data.billingCycleId))
+          && request.resource.data.studentId
+            == get(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.studentId
+          && request.resource.data.term
+            == get(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.term
+          && getAfter(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.status == "paid"
+          && getAfter(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.paymentId == paymentId;
+        allow update, delete: if false;
+      }
+
+      match /migrations/{migrationId} {
+        allow read: if isOwner(workspaceId);
+        allow create: if isOwner(workspaceId)
+          && request.resource.data.keys().hasAll(["name", "completedAt", "completedBy"])
+          && request.resource.data.keys().hasOnly(["name", "completedAt", "completedBy"])
+          && request.resource.data.name is string
+          && request.resource.data.completedAt == request.time
+          && request.resource.data.completedBy == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
     match /{document=**} {
-      allow read, write: if isAuthorizedUser();
+      allow read, write: if false;
     }
   }
 }

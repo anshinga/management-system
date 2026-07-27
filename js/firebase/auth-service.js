@@ -1,7 +1,5 @@
 import {
   onAuthStateChanged as observeAuthState,
-  GoogleAuthProvider,
-  signInWithCredential,
   signInWithPopup,
   signOut as firebaseSignOut,
 } from "firebase/auth";
@@ -20,15 +18,6 @@ export function isAuthorizedUser(user) {
 }
 
 export function signInWithGoogle() {
-  if (import.meta.env.DEV && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true") {
-    const mockGoogleIdToken = JSON.stringify({
-      sub: "local-owner",
-      email: APP_CONFIG.ownerEmail,
-      email_verified: true,
-      name: "本機測試管理員",
-    });
-    return signInWithCredential(auth, GoogleAuthProvider.credential(mockGoogleIdToken));
-  }
   return signInWithPopup(auth, provider);
 }
 

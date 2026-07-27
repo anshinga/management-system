@@ -5,7 +5,6 @@ import {
   signOut,
   subscribeToAuthState,
 } from "./firebase/auth-service.js";
-import { APP_CONFIG } from "./config.js";
 
 const authGate = document.querySelector("#auth-gate");
 const authTitle = document.querySelector("#auth-title");
@@ -258,10 +257,7 @@ subscribeToAuthState(async (user) => {
       : {
           title: "登入管理系統",
           message: "請使用已授權的 Google 帳號登入。",
-          actionLabel: import.meta.env.DEV
-            && import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true"
-            ? "使用本機 Owner 測試登入"
-            : "使用 Google 登入",
+          actionLabel: "使用 Google 登入",
         });
     return;
   }

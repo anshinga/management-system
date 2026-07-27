@@ -1,53 +1,42 @@
 # MPM 點名系統
 
-以 Firebase Authentication、Cloud Firestore 與 Firebase Hosting 建置的課程管理系統。
+網站由 GitHub Pages 直接發布；Firebase Authentication 與 Cloud Firestore 只負責登入、權限與雲端資料同步。
 
 ## 架構
 
+- GitHub Pages 直接讀取專案根目錄的 `index.html`、`css/` 與 `js/`，不需要 Vite 或 production build。
+- `index.html` 透過 Firebase 官方 CDN import map 載入 Firebase Web SDK。
 - Google Authentication 負責登入；實際資料權限由 `workspaces/mpm-main/members` 與 Firestore Security Rules 共同決定。
 - `students`、`seasons`、`scheduleEntries`、`scheduleOverrides`、`attendance`、`billingCycles`、`payments` 分開保存，介面透過 Firestore 即時監聽同步。
 - 第 24 堂點名會在同一個 transaction 內推進學生期數並建立待付款期別；付款 transaction 會新增不可修改的付款歷史並結清期別。
 - `localStorage` 只保存深色模式與目前選取的點名日期，不保存業務資料。
-- 正式 Firebase 專案為 `denmin-b0a26`，預設工作區為 `mpm-main`。
+- Firebase 專案為 `denmin-b0a26`，預設工作區為 `mpm-main`。
 
-## 本機開發
+## GitHub Pages 發布
+
+一般介面或功能修改只需要依原有 GitHub 流程 commit、push，並合併到 GitHub Pages 使用的分支。GitHub Pages 會直接發布根目錄，不需要執行 `npm run build` 或 `firebase deploy`。
+
+若 Google 登入顯示 `auth/unauthorized-domain`，請在 Firebase Console 的 Authentication 設定中，將 `anshinga.github.io` 加入 Authorized domains。
+
+## 測試
+
+只有執行自動測試時才需要安裝 npm 套件：
 
 ```powershell
 npm.cmd install
-npm.cmd run dev
-```
-
-若要使用完全隔離的本機 Firebase：
-
-```powershell
-$env:VITE_USE_FIREBASE_EMULATORS="true"
-npm.cmd run emulators
-npm.cmd run dev
-```
-
-開發模式只有在 `VITE_USE_FIREBASE_EMULATORS=true` 時才會連線至 Auth 與 Firestore Emulator；production build 永遠使用正式 Firebase 設定。
-
-## 驗證
-
-```powershell
-npm.cmd run build
 npm.cmd test
 npm.cmd run test:rules
 ```
 
-`test:rules` 會透過 Firebase Emulator 執行 Firestore Security Rules 測試，不會連線至正式資料庫。
+`test:rules` 會透過本機 Firestore Emulator 驗證 Security Rules，不會連線或寫入正式資料庫。
 
-## 部署
+## Firebase 後端設定
 
-完成測試、確認 Firebase 專案與登入帳號後：
+一般前端功能修改不需要部署 Firebase。只有變更 `firestore.rules` 或 `firestore.indexes.json` 時，才需要：
 
 ```powershell
 npx.cmd firebase login
-npx.cmd firebase deploy
+npx.cmd firebase deploy --only firestore
 ```
 
-`firebase deploy` 會先執行 Hosting 的 `predeploy`，自動執行 production build，再從 `dist` 部署；不需要手動執行 `npm run build`。部署也會同時更新 Firestore Rules 與 indexes。
-
-部署後若在瀏覽器原始碼看到 `./js/app.js`，代表部署時沒有使用本專案根目錄的 `firebase.json`；正確的 production HTML 會載入 `/assets/index-*.js`。
-
-不要將 Service Account JSON、Token 或其他秘密資料加入版本控制；前端的 `firebaseConfig` 是 Firebase Web App 的公開識別設定，安全性仍以 Authentication 與 Security Rules 為準。
+不要重新執行 `firebase init hosting`，也不要將 Service Account JSON、Token 或其他秘密資料加入版本控制。前端的 `firebaseConfig` 是 Firebase Web App 的公開識別設定，安全性仍以 Authentication 與 Security Rules 為準。

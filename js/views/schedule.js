@@ -1,6 +1,5 @@
 import {
   addDays,
-  ensureWeek,
   formatDate,
   getSeasonForDate,
   getSchedule,
@@ -8,10 +7,11 @@ import {
   getStudent,
   getWeekDates,
   getWeekStart,
-  moveStudent,
   parseDate,
-  saveState,
 } from "../store.js";
+import { ensureScheduleWeek, moveScheduleEntry } from "../repositories/schedule-repository.js";
+import { escapeAttribute, escapeHtml } from "../ui/html.js";
+import { getUserErrorMessage } from "../ui/errors.js";
 
 const slots = ["15:00", "16:30", "18:00", "19:00", "19:30", "21:00"];
 const weekdays = ["週一", "週二", "週三", "週四", "週五", "週六"];
@@ -19,6 +19,7 @@ let scheduleWeekStart = getWeekStart(new Date());
 let scheduleSearch = "";
 let paletteCollapsed = false;
 let observedAttendanceDate = null;
+let lastEnsuredWeekKey = "";
 
 function shortDate(date) { return `${date.getMonth() + 1}/${date.getDate()}`; }
 
@@ -35,18 +36,17 @@ export function renderSchedule(state) {
   scheduleWeekStart = getWeekStart(scheduleWeekStart);
   const weekDates = getWeekDates(scheduleWeekStart);
   const season = getSeasonForDate(state, weekDates[0]);
-  if (ensureWeek(state, scheduleWeekStart)) saveState(state);
   const activeStudents = [...state.students].filter((student) => student.status === "active").sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name, "zh-Hant"));
   const filteredStudents = activeStudents.filter((student) => !scheduleSearch || `${student.name}${student.grade}`.includes(scheduleSearch));
   const groupedStudents = [...new Set(filteredStudents.map((student) => student.grade))].sort((a, b) => a - b).map((grade) => ({ grade, students: filteredStudents.filter((student) => student.grade === grade) }));
 
-  return `<div class="page-head"><div><p class="eyebrow">${season?.name || "目前時段"}</p><h2>排課</h2><p>每週獨立保存日期，下一週首次開啟時會沿用前一週排課。<br>目前顯示 ${attendanceDate} 的到班標示</p></div><span class="status-badge active">可拖曳編輯</span></div>
+  return `<div class="page-head"><div><p class="eyebrow">${escapeHtml(season?.name || "目前時段")}</p><h2>排課</h2><p>每週獨立保存日期，下一週首次開啟時會沿用前一週排課。<br>目前顯示 ${attendanceDate} 的到班標示</p></div><span class="status-badge active">可拖曳編輯</span></div>
     <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週">‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(weekDates[5])} ${weekdays[5]}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(weekDates[5])}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週">›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
-    <div class="schedule-editor ${paletteCollapsed ? "palette-collapsed" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${scheduleSearch}" placeholder="搜尋姓名或年級" /><p class="drag-hint">按住學生卡片，拖到右側日期與時間格。</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${slots.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot)).join("")}`).join("")}</div></div></section></div>`;
+    <div class="schedule-editor ${paletteCollapsed ? "palette-collapsed" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">按住學生卡片，拖到右側日期與時間格。</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${slots.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot)).join("")}`).join("")}</div></div></section></div>`;
 }
 
 function renderPaletteStudent(student) {
-  return `<div class="drag-student palette-student" draggable="true" data-drag-student="${student.id}" data-drag-source="palette" tabindex="0"><span>${student.name}</span></div>`;
+  return `<div class="drag-student palette-student" draggable="true" data-drag-student="${escapeAttribute(student.id)}" data-drag-source="palette" tabindex="0" role="button" aria-label="選取 ${escapeAttribute(student.name)} 進行排課"><span>${escapeHtml(student.name)}</span></div>`;
 }
 
 function renderCell(state, date, slot) {
@@ -55,15 +55,24 @@ function renderCell(state, date, slot) {
   const seasonId = getSeasonForDate(state, date)?.id || "summer-2026";
   const schedule = getSchedule(state, dateKey, slot, seasonId);
   const students = schedule?.studentIds.map((id) => getStudent(state, id)).filter(Boolean) || [];
-  const attendanceRecords = state.attendance.filter((item) => item.date === dateKey && item.slot === slot && item.type !== "leave");
+  const attendanceRecords = state.attendance.filter((item) => item.dateKey === dateKey && item.slot === slot);
   const presentStudentIds = new Set(attendanceRecords.map((item) => item.studentId));
   const attendedCount = students.filter((student) => presentStudentIds.has(student.id)).length;
   const isAttendanceDate = dateKey === attendanceDate;
   const cellClass = `schedule-cell${isAttendanceDate ? " is-attendance-date" : ""}${isAttendanceDate && attendedCount ? " has-attendance" : ""}`;
-  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}"><div class="cell-count"><span>${students.length} 人</span>${isAttendanceDate ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}</div><div class="cell-students">${students.map((student) => { const isLocked = presentStudentIds.has(student.id); const studentClass = `drag-student schedule-student${isAttendanceDate && isLocked ? " is-present" : ""}${isLocked ? " is-locked" : ""}`; const dragAttributes = isLocked ? `aria-disabled="true" title="已簽到，無法調整排課"` : `draggable="true" title="拖曳以調整時間"`; return `<div class="${studentClass}" ${dragAttributes} data-drag-student="${student.id}" data-drag-source="schedule" data-source-date="${dateKey}" data-source-slot="${slot}" data-source-season="${seasonId}"><span>${student.name}</span></div>`; }).join("") || '<span class="student-subtitle">尚未排課</span>'}</div></div>`;
+  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}" tabindex="0" role="button" aria-label="${dateKey} ${slot} 排課格"><div class="cell-count"><span>${students.length} 人</span>${isAttendanceDate ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}</div><div class="cell-students">${students.map((student) => { const isLocked = presentStudentIds.has(student.id); const studentClass = `drag-student schedule-student${isAttendanceDate && isLocked ? " is-present" : ""}${isLocked ? " is-locked" : ""}`; const dragAttributes = isLocked ? `aria-disabled="true" title="已簽到，無法調整排課"` : `draggable="true" tabindex="0" role="button" aria-label="選取 ${escapeAttribute(student.name)} 以調整排課" title="拖曳或按 Enter 調整時間"`; return `<div class="${studentClass}" ${dragAttributes} data-drag-student="${escapeAttribute(student.id)}" data-drag-source="schedule" data-source-date="${dateKey}" data-source-slot="${slot}" data-source-season="${escapeAttribute(seasonId)}"><span>${escapeHtml(student.name)}</span></div>`; }).join("") || '<span class="student-subtitle">尚未排課</span>'}</div></div>`;
 }
 
-export function bindSchedule(app, state, refresh) {
+export function bindSchedule(app, state, refresh, showToast) {
+  const visibleSeason = getSeasonForDate(state, scheduleWeekStart);
+  const ensureKey = `${visibleSeason?.id || ""}:${formatDate(scheduleWeekStart)}`;
+  if (visibleSeason && ensureKey !== lastEnsuredWeekKey) {
+    lastEnsuredWeekKey = ensureKey;
+    ensureScheduleWeek(scheduleWeekStart, visibleSeason.id).catch((error) => {
+      lastEnsuredWeekKey = "";
+      showToast(getUserErrorMessage(error, "無法沿用前一週排課"));
+    });
+  }
   app.querySelector('[data-action="prev-week"]')?.addEventListener("click", () => { scheduleWeekStart = addDays(scheduleWeekStart, -7); refresh(); });
   app.querySelector('[data-action="next-week"]')?.addEventListener("click", () => { scheduleWeekStart = addDays(scheduleWeekStart, 7); refresh(); });
   app.querySelector('[data-action="current-week"]')?.addEventListener("click", () => { scheduleWeekStart = getWeekStart(new Date()); refresh(); });
@@ -80,6 +89,7 @@ export function bindSchedule(app, state, refresh) {
 
   let desktopDrag = null;
   let touchDrag = null;
+  let keyboardDrag = null;
   const dragItems = [...app.querySelectorAll("[data-drag-student]:not(.is-locked)")];
   const cells = [...app.querySelectorAll(".schedule-cell")];
   const getDragData = (item) => ({
@@ -88,10 +98,23 @@ export function bindSchedule(app, state, refresh) {
   });
   const drop = (data, cell) => {
     if (!cell || !data) return;
-    const hasAttendanceOnDate = (date) => state.attendance.some((item) => item.studentId === data.studentId && item.date === date && item.type !== "leave");
+    const hasAttendanceOnDate = (date) => state.attendance.some((item) => item.studentId === data.studentId && item.dateKey === date);
     if (hasAttendanceOnDate(cell.dataset.date) || (data.source && hasAttendanceOnDate(data.source.date))) return;
-    moveStudent(state, data.studentId, data.source, { date: cell.dataset.date, slot: cell.dataset.slot, season: cell.dataset.season });
-    refresh();
+    const source = data.source ? {
+      dateKey: data.source.date,
+      slot: data.source.slot,
+      seasonId: data.source.season,
+    } : null;
+    moveScheduleEntry(data.studentId, source, {
+      dateKey: cell.dataset.date,
+      slot: cell.dataset.slot,
+      seasonId: cell.dataset.season,
+    }).catch((error) => showToast(getUserErrorMessage(error, "排課更新失敗")));
+  };
+  const clearKeyboardDrag = () => {
+    keyboardDrag = null;
+    dragItems.forEach((item) => item.classList.remove("is-dragging"));
+    cells.forEach((cell) => cell.classList.remove("is-drop-target"));
   };
 
   dragItems.forEach((item) => {
@@ -105,11 +128,27 @@ export function bindSchedule(app, state, refresh) {
       document.addEventListener("pointermove", onTouchMove, { passive: false });
       document.addEventListener("pointerup", onTouchEnd, { once: true });
     });
+    item.addEventListener("keydown", (event) => {
+      if (!["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      clearKeyboardDrag();
+      keyboardDrag = getDragData(item);
+      item.classList.add("is-dragging");
+      cells.forEach((cell) => cell.classList.add("is-drop-target"));
+      showToast("已選取學生，請在目標排課格按 Enter");
+    });
   });
   cells.forEach((cell) => {
     cell.addEventListener("dragover", (event) => { event.preventDefault(); cell.classList.add("is-drop-target"); });
     cell.addEventListener("dragleave", () => cell.classList.remove("is-drop-target"));
     cell.addEventListener("drop", (event) => { event.preventDefault(); cell.classList.remove("is-drop-target"); drop(desktopDrag, cell); });
+    cell.addEventListener("keydown", (event) => {
+      if (!keyboardDrag || !["Enter", " "].includes(event.key)) return;
+      event.preventDefault();
+      const data = keyboardDrag;
+      clearKeyboardDrag();
+      drop(data, cell);
+    });
   });
 
   function onTouchMove(event) {

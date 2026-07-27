@@ -13,4 +13,11 @@ describe("user-facing errors", () => {
   test("未知技術錯誤使用指定的備援訊息", () => {
     expect(getUserErrorMessage({ message: "FirebaseError: internal" }, "儲存失敗")).toBe("儲存失敗");
   });
+
+  test("Firestore 缺少索引時顯示可理解的提示", () => {
+    expect(getUserErrorMessage({
+      code: "failed-precondition",
+      message: "The query requires an index. You can create it here: create_composite",
+    })).toBe("雲端排課索引尚未就緒，請稍後再試。");
+  });
 });

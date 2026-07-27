@@ -11,6 +11,20 @@
         {
           "fieldPath": "dateKey",
           "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "scheduleEntries",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "seasonId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dateKey",
+          "order": "ASCENDING"
         },
         {
           "fieldPath": "slot",

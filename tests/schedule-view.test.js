@@ -92,17 +92,17 @@ beforeEach(() => {
 });
 
 describe("schedule view", () => {
-  test("排課與點名共用每 90 分鐘一個區間的五個時段", () => {
+  test("排課與點名共用四個 90 分鐘時段，最後一堂於 21:00 結束", () => {
     expect(SCHEDULE_SLOTS).toEqual([
       "15:00",
       "16:30",
       "18:00",
       "19:30",
-      "21:00",
     ]);
     const html = renderSchedule(state);
     expect(html).toContain(">19:30<");
     expect(html).not.toContain(">19:00<");
+    expect(html).not.toContain(">21:00<");
   });
 
   test("鉛筆按鈕會切換刪除模式並顯示移除操作", () => {

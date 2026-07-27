@@ -12,5 +12,4 @@ export const SCHEDULE_SLOTS = Object.freeze([
   "16:30",
   "18:00",
   "19:30",
-  "21:00",
 ]);

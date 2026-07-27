@@ -9,6 +9,7 @@ import {
   getWeekStart,
   parseDate,
 } from "../store.js";
+import { SCHEDULE_SLOTS } from "../config.js";
 import {
   ensureScheduleWeek,
   moveScheduleEntry,
@@ -17,7 +18,6 @@ import {
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
 
-const slots = ["15:00", "16:30", "18:00", "19:00", "19:30", "21:00"];
 const weekdays = ["週一", "週二", "週三", "週四", "週五", "週六"];
 let scheduleWeekStart = getWeekStart(new Date());
 let scheduleSearch = "";
@@ -25,8 +25,7 @@ let paletteCollapsed = false;
 let deletionMode = false;
 let observedAttendanceDate = null;
 let lastEnsuredWeekKey = "";
-let visibleWeekEnsurePromise = Promise.resolve(true);
-let pendingWeekNavigation = false;
+let scheduleEnsureQueue = Promise.resolve();
 
 function shortDate(date) { return `${date.getMonth() + 1}/${date.getDate()}`; }
 
@@ -49,7 +48,7 @@ export function renderSchedule(state) {
 
   return `<div class="page-head"><div><p class="eyebrow">${escapeHtml(season?.name || "目前時段")}</p><h2>排課</h2><p>每週獨立保存日期，下一週首次開啟時會沿用前一週排課。<br>目前顯示 ${attendanceDate} 的到班標示${deletionMode ? '<br><span class="delete-mode-hint">刪除模式：點選學生卡片上的 ×，將從本週起移除。</span>' : ""}</p></div><button class="button-secondary schedule-edit-button${deletionMode ? " is-active" : ""}" data-action="toggle-delete-mode" type="button" aria-pressed="${deletionMode}"><span aria-hidden="true">${deletionMode ? "✓" : "✎"}</span> ${deletionMode ? "完成" : "修改排課"}</button></div>
     <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週">‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(weekDates[5])} ${weekdays[5]}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(weekDates[5])}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週">›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
-    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${slots.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot)).join("")}`).join("")}</div></div></section></div>`;
+    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot)).join("")}`).join("")}</div></div></section></div>`;
 }
 
 function renderPaletteStudent(student) {
@@ -102,31 +101,18 @@ export function bindSchedule(app, state, refresh, showToast) {
   const ensureKey = `${visibleSeason?.id || ""}:${formatDate(scheduleWeekStart)}`;
   if (visibleSeason && ensureKey !== lastEnsuredWeekKey) {
     lastEnsuredWeekKey = ensureKey;
-    visibleWeekEnsurePromise = ensureScheduleWeek(scheduleWeekStart, visibleSeason.id).then(() => true).catch((error) => {
-      lastEnsuredWeekKey = "";
-      showToast(getUserErrorMessage(error, "無法沿用前一週排課"));
-      return false;
-    });
+    const queuedWeekStart = getWeekStart(scheduleWeekStart);
+    scheduleEnsureQueue = scheduleEnsureQueue
+      .catch(() => undefined)
+      .then(() => ensureScheduleWeek(queuedWeekStart, visibleSeason.id))
+      .catch((error) => {
+        if (lastEnsuredWeekKey === ensureKey) lastEnsuredWeekKey = "";
+        showToast(getUserErrorMessage(error, "無法沿用前一週排課"));
+      });
   }
-  const navigateToWeek = async (targetWeekStart) => {
-    if (pendingWeekNavigation) return;
-    pendingWeekNavigation = true;
-    const navigationButtons = [...app.querySelectorAll(".week-toolbar button")];
-    navigationButtons.forEach((button) => { button.disabled = true; });
-    try {
-      if (!await visibleWeekEnsurePromise) return;
-      const targetSeason = getSeasonForDate(state, targetWeekStart);
-      if (targetSeason) await ensureScheduleWeek(targetWeekStart, targetSeason.id);
-      scheduleWeekStart = getWeekStart(targetWeekStart);
-      lastEnsuredWeekKey = `${targetSeason?.id || ""}:${formatDate(scheduleWeekStart)}`;
-      visibleWeekEnsurePromise = Promise.resolve(true);
-      refresh();
-    } catch (error) {
-      showToast(getUserErrorMessage(error, "無法沿用前一週排課"));
-    } finally {
-      pendingWeekNavigation = false;
-      navigationButtons.forEach((button) => { button.disabled = false; });
-    }
+  const navigateToWeek = (targetWeekStart) => {
+    scheduleWeekStart = getWeekStart(targetWeekStart);
+    refresh();
   };
   app.querySelector('[data-action="prev-week"]')?.addEventListener("click", () => navigateToWeek(addDays(scheduleWeekStart, -7)));
   app.querySelector('[data-action="next-week"]')?.addEventListener("click", () => navigateToWeek(addDays(scheduleWeekStart, 7)));

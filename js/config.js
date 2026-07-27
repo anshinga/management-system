@@ -6,3 +6,11 @@ export const APP_CONFIG = Object.freeze({
   schemaVersion: 1,
   ownerEmail: "anshinga79@gmail.com",
 });
+
+export const SCHEDULE_SLOTS = Object.freeze([
+  "15:00",
+  "16:30",
+  "18:00",
+  "19:30",
+  "21:00",
+]);

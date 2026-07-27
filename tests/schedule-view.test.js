@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
+import { SCHEDULE_SLOTS } from "../js/config.js";
 
 const ensureScheduleWeek = vi.fn(() => Promise.resolve(false));
 const moveScheduleEntry = vi.fn(() => Promise.resolve());
@@ -30,10 +31,19 @@ class FakeButton {
 
 function makeApp({ removeButton } = {}) {
   const toggleButton = new FakeButton();
+  const previousButton = new FakeButton();
+  const nextButton = new FakeButton();
+  const currentWeekButton = new FakeButton();
   return {
     toggleButton,
+    previousButton,
+    nextButton,
+    currentWeekButton,
     querySelector(selector) {
       if (selector === '[data-action="toggle-delete-mode"]') return toggleButton;
+      if (selector === '[data-action="prev-week"]') return previousButton;
+      if (selector === '[data-action="next-week"]') return nextButton;
+      if (selector === '[data-action="current-week"]') return currentWeekButton;
       return null;
     },
     querySelectorAll(selector) {
@@ -82,6 +92,19 @@ beforeEach(() => {
 });
 
 describe("schedule view", () => {
+  test("排課與點名共用每 90 分鐘一個區間的五個時段", () => {
+    expect(SCHEDULE_SLOTS).toEqual([
+      "15:00",
+      "16:30",
+      "18:00",
+      "19:30",
+      "21:00",
+    ]);
+    const html = renderSchedule(state);
+    expect(html).toContain(">19:30<");
+    expect(html).not.toContain(">19:00<");
+  });
+
   test("鉛筆按鈕會切換刪除模式並顯示移除操作", () => {
     let html = renderSchedule(state);
     expect(html).toContain("✎");
@@ -125,5 +148,22 @@ describe("schedule view", () => {
     });
 
     app.toggleButton.click();
+  });
+
+  test("左右切週按鈕會立即切換畫面，不等待 Firebase 沿用完成", () => {
+    let html = renderSchedule(state);
+    const app = makeApp();
+    bindSchedule(app, state, () => {
+      html = renderSchedule(state);
+    }, vi.fn());
+
+    app.previousButton.click();
+    expect(html).toContain("7/20 週一 — 7/25 週六");
+
+    app.nextButton.click();
+    expect(html).toContain("7/27 週一 — 8/1 週六");
+
+    app.nextButton.click();
+    expect(html).toContain("8/3 週一 — 8/8 週六");
   });
 });

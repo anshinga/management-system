@@ -180,7 +180,6 @@ textarea.input { resize: vertical; }
 .cell-edit { background: transparent; border: 0; color: var(--muted); font-size: 12px; margin-top: 10px; padding: 0; }
 .cell-edit:hover { color: var(--gold-dark); }
 .week-toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 18px; }
-.week-toolbar button:disabled { cursor: wait; opacity: .55; }
 .week-title { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: center; }
 .week-title span { color: var(--muted); font-size: 12px; }
 .schedule-edit-button { align-items: center; display: inline-flex; gap: 5px; white-space: nowrap; }

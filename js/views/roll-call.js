@@ -10,6 +10,7 @@ import {
   parseDate,
   setSelectedAttendanceDate,
 } from "../store.js";
+import { SCHEDULE_SLOTS } from "../config.js";
 import {
   markAttendance,
   removeLatestAttendance,
@@ -19,7 +20,6 @@ import { ensureScheduleWeek } from "../repositories/schedule-repository.js";
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
 
-const slots = ["15:00", "16:30", "18:00", "19:00", "19:30", "21:00"];
 const weekdays = ["週一", "週二", "週三", "週四", "週五", "週六"];
 let lastEnsuredAttendanceWeekKey = "";
 
@@ -34,7 +34,7 @@ export function renderRollCall(state, refresh) {
   const weekday = getWeekday(dateObject);
   const pageTitle = date === getTodayDate() ? "今日點名" : "歷史點名";
   const season = getSeasonForDate(state, date);
-  const todaySchedules = slots.map((slot) => ({ slot, schedule: getSchedule(state, date, slot, season?.id) })).filter((item) => item.schedule);
+  const todaySchedules = SCHEDULE_SLOTS.map((slot) => ({ slot, schedule: getSchedule(state, date, slot, season?.id) })).filter((item) => item.schedule);
   const present = state.attendance.filter((item) => item.dateKey === date).length;
   const pending = state.billingCycles.filter((cycle) => cycle.status === "pending").length;
   const activeStudents = todaySchedules.flatMap(({ schedule }) => schedule.studentIds).filter((id, index, list) => list.indexOf(id) === index);

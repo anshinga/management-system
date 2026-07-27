@@ -180,8 +180,12 @@ textarea.input { resize: vertical; }
 .cell-edit { background: transparent; border: 0; color: var(--muted); font-size: 12px; margin-top: 10px; padding: 0; }
 .cell-edit:hover { color: var(--gold-dark); }
 .week-toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 18px; }
+.week-toolbar button:disabled { cursor: wait; opacity: .55; }
 .week-title { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: center; }
 .week-title span { color: var(--muted); font-size: 12px; }
+.schedule-edit-button { align-items: center; display: inline-flex; gap: 5px; white-space: nowrap; }
+.schedule-edit-button.is-active { background: var(--gold-soft); border-color: var(--gold); color: var(--gold-dark); }
+.delete-mode-hint { color: var(--danger); font-weight: 600; }
 .schedule-editor { align-items: start; display: grid; gap: 16px; grid-template-columns: 210px minmax(0, 1fr); min-width: 0; }
 .student-palette { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 680px; overflow: auto; padding: 15px; position: sticky; top: 14px; }
 .palette-head { align-items: baseline; display: flex; justify-content: space-between; margin-bottom: 12px; }
@@ -214,6 +218,25 @@ textarea.input { resize: vertical; }
 .schedule-student.is-locked { cursor: not-allowed; opacity: .82; }
 .schedule-student:hover { border-color: var(--gold); }
 .schedule-student span { min-width: 0; }
+.schedule-editor.is-delete-mode .schedule-student { justify-content: space-between; }
+.schedule-student.is-delete-candidate { border-color: #e3bcbc; }
+.schedule-remove-button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  color: var(--danger);
+  display: inline-flex;
+  flex: 0 0 22px;
+  font-size: 17px;
+  height: 22px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  width: 22px;
+}
+.schedule-remove-button:hover, .schedule-remove-button:focus-visible { background: var(--danger); color: white; outline: none; }
+.schedule-remove-button:disabled { cursor: wait; opacity: .5; }
 .collapsed-palette-bar { display: none; }
 .schedule-editor.palette-collapsed { grid-template-columns: minmax(0, 1fr); }
 .schedule-editor.palette-collapsed .student-palette { display: none; }

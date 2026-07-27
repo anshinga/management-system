@@ -1,8 +1,11 @@
 import { describe, expect, test } from "vitest";
 import {
+  buildCarryForwardEntries,
+  getSchedulePattern,
   groupScheduleEntries,
   makeScheduleEntryId,
   makeScheduleOverrideId,
+  makeSchedulePatternKey,
 } from "../js/domain/schedule.js";
 
 describe("schedule domain", () => {
@@ -22,6 +25,40 @@ describe("schedule domain", () => {
       sourceWeekday: 1,
       sourceSlot: "16:30",
     })).toBe("2026-07-27__summer-2026__student-1__1__16%3A30");
+  });
+
+  test("相隔一週的相同時段會得到相同排課模式", () => {
+    expect(getSchedulePattern({
+      dateKey: "2026-07-27",
+      slot: "16:30",
+    })).toEqual({
+      sourceWeekday: 1,
+      sourceSlot: "16:30",
+    });
+    expect(makeSchedulePatternKey({
+      studentId: "student-1",
+      dateKey: "2026-08-03",
+      slot: "16:30",
+    })).toBe("student-1\u00001\u000016:30");
+  });
+
+  test("沿用前一週時略過既有排課與已刪除的例外", () => {
+    expect(buildCarryForwardEntries({
+      previousEntries: [
+        { studentId: "s1", seasonId: "summer", dateKey: "2026-07-27", slot: "16:30" },
+        { studentId: "s2", seasonId: "summer", dateKey: "2026-07-28", slot: "18:00" },
+        { studentId: "s3", seasonId: "summer", dateKey: "2026-07-29", slot: "19:00" },
+      ],
+      currentEntries: [
+        { studentId: "s1", seasonId: "summer", dateKey: "2026-08-03", slot: "16:30" },
+      ],
+      overrides: [
+        { studentId: "s2", sourceWeekday: 2, sourceSlot: "18:00" },
+      ],
+      seasonId: "summer",
+    })).toEqual([
+      { studentId: "s3", seasonId: "summer", dateKey: "2026-08-05", slot: "19:00" },
+    ]);
   });
 
   test("排課文件可組合成既有畫面使用的時段資料", () => {

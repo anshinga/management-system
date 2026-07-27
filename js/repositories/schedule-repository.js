@@ -6,19 +6,17 @@ import {
   where,
 } from "firebase/firestore";
 import { addDays, formatDate, getWeekStart, parseDate } from "../store.js";
-import { makeScheduleEntryId, makeScheduleOverrideId } from "../domain/schedule.js";
+import {
+  buildCarryForwardEntries,
+  getSchedulePattern,
+  makeScheduleEntryId,
+  makeScheduleOverrideId,
+} from "../domain/schedule.js";
 import { db } from "../firebase/firestore.js";
 import { COLLECTIONS, workspaceCollectionRef, workspaceDocumentRef } from "./firestore-paths.js";
 
 function entryReference(entry) {
   return workspaceDocumentRef(COLLECTIONS.scheduleEntries, makeScheduleEntryId(entry));
-}
-
-function schedulePattern({ dateKey, slot }) {
-  const date = parseDate(dateKey);
-  const weekStartDate = getWeekStart(date);
-  const sourceWeekday = Math.round((date.getTime() - weekStartDate.getTime()) / 86400000) + 1;
-  return { sourceWeekday, sourceSlot: slot };
 }
 
 function overrideData({ dateKey, seasonId, studentId, slot }) {
@@ -27,7 +25,7 @@ function overrideData({ dateKey, seasonId, studentId, slot }) {
     weekStart,
     seasonId,
     studentId,
-    ...schedulePattern({ dateKey, slot }),
+    ...getSchedulePattern({ dateKey, slot }),
   };
 }
 
@@ -39,14 +37,11 @@ function entryData({ studentId, seasonId, dateKey, slot }) {
   return { studentId, seasonId, dateKey, slot };
 }
 
-async function getFutureMoveOperations(studentId, sourceData, targetData) {
-  if (!sourceData || sourceData.seasonId !== targetData.seasonId) return [];
+async function getFuturePatternEntries(studentId, sourceData) {
+  if (!sourceData) return [];
   const currentWeekStart = getWeekStart(parseDate(sourceData.dateKey));
   const currentWeekEnd = formatDate(addDays(currentWeekStart, 6));
-  const sourcePattern = schedulePattern(sourceData);
-  const targetPattern = schedulePattern(targetData);
-  if (sourcePattern.sourceWeekday === targetPattern.sourceWeekday
-    && sourcePattern.sourceSlot === targetPattern.sourceSlot) return [];
+  const sourcePattern = getSchedulePattern(sourceData);
 
   const [futureEntries, futureOverrides] = await Promise.all([
     getDocs(query(
@@ -73,12 +68,27 @@ async function getFutureMoveOperations(studentId, sourceData, targetData) {
   const operations = futureEntries.docs
     .map((snapshot) => ({ snapshot, data: snapshot.data() }))
     .filter(({ data }) => {
-      const pattern = schedulePattern(data);
+      const pattern = getSchedulePattern(data);
       const weekStart = formatDate(getWeekStart(parseDate(data.dateKey)));
       return pattern.sourceWeekday === sourcePattern.sourceWeekday
         && pattern.sourceSlot === sourcePattern.sourceSlot
         && (!boundary || weekStart < boundary);
-    })
+    });
+
+  if (operations.length > 200) {
+    throw new Error("未來排課筆數過多，請分段調整或聯絡系統管理員。");
+  }
+  return operations;
+}
+
+async function getFutureMoveOperations(studentId, sourceData, targetData) {
+  if (!sourceData || sourceData.seasonId !== targetData.seasonId) return [];
+  const sourcePattern = getSchedulePattern(sourceData);
+  const targetPattern = getSchedulePattern(targetData);
+  if (sourcePattern.sourceWeekday === targetPattern.sourceWeekday
+    && sourcePattern.sourceSlot === targetPattern.sourceSlot) return [];
+
+  return (await getFuturePatternEntries(studentId, sourceData))
     .map(({ snapshot, data }) => {
       const weekStart = getWeekStart(parseDate(data.dateKey));
       const target = {
@@ -93,11 +103,6 @@ async function getFutureMoveOperations(studentId, sourceData, targetData) {
         target,
       };
     });
-
-  if (operations.length > 200) {
-    throw new Error("未來排課筆數過多，請分段調整或聯絡系統管理員。");
-  }
-  return operations;
 }
 
 export async function moveScheduleEntry(studentId, source, target) {
@@ -162,6 +167,43 @@ export async function moveScheduleEntry(studentId, source, target) {
   });
 }
 
+export async function removeScheduleEntry(studentId, source) {
+  if (!studentId || !source?.dateKey || !source?.slot || !source?.seasonId) {
+    throw new Error("缺少移除排課所需資料。");
+  }
+
+  const sourceData = entryData({ studentId, ...source });
+  const sourceRef = entryReference(sourceData);
+  const sourceOverrideRef = overrideReference(sourceData);
+  const futureEntries = await getFuturePatternEntries(studentId, sourceData);
+  const references = [...new Map([
+    sourceRef,
+    sourceOverrideRef,
+    ...futureEntries.map(({ snapshot }) => snapshot.ref),
+  ].map((reference) => [reference.path, reference])).values()];
+
+  await runTransaction(db, async (transaction) => {
+    const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
+    const snapshotByPath = new Map(snapshots.map((snapshot) => [snapshot.ref.path, snapshot]));
+
+    if (snapshotByPath.get(sourceRef.path)?.exists()) transaction.delete(sourceRef);
+    futureEntries.forEach(({ snapshot }) => {
+      if (snapshotByPath.get(snapshot.ref.path)?.exists()) transaction.delete(snapshot.ref);
+    });
+
+    const overrideSnapshot = snapshotByPath.get(sourceOverrideRef.path);
+    if (overrideSnapshot?.exists()) {
+      transaction.update(sourceOverrideRef, { updatedAt: serverTimestamp() });
+      return;
+    }
+    transaction.set(sourceOverrideRef, {
+      ...overrideData(sourceData),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
 export async function ensureScheduleWeek(date, seasonId) {
   const weekStartDate = getWeekStart(typeof date === "string" ? parseDate(date) : date);
   const weekStart = formatDate(weekStartDate);
@@ -185,23 +227,12 @@ export async function ensureScheduleWeek(date, seasonId) {
       where("weekStart", "==", weekStart))),
   ]);
 
-  const existingEntryIds = new Set(currentSnapshot.docs.map((snapshot) => snapshot.id));
-  const overriddenPatterns = new Set(overrideSnapshot.docs.map((snapshot) => {
-    const value = snapshot.data();
-    return `${value.studentId}\u0000${value.sourceWeekday}\u0000${value.sourceSlot}`;
-  }));
-  const missingEntries = previousSnapshot.docs
-    .map((snapshot) => snapshot.data())
-    .map((entry) => ({
-      studentId: entry.studentId,
-      seasonId,
-      dateKey: formatDate(addDays(parseDate(entry.dateKey), 7)),
-      slot: entry.slot,
-      sourcePattern: `${entry.studentId}\u0000${schedulePattern(entry).sourceWeekday}\u0000${entry.slot}`,
-    }))
-    .filter((entry) => !existingEntryIds.has(makeScheduleEntryId(entry))
-      && !overriddenPatterns.has(entry.sourcePattern))
-    .map(({ sourcePattern, ...entry }) => entry);
+  const missingEntries = buildCarryForwardEntries({
+    previousEntries: previousSnapshot.docs.map((snapshot) => snapshot.data()),
+    currentEntries: currentSnapshot.docs.map((snapshot) => snapshot.data()),
+    overrides: overrideSnapshot.docs.map((snapshot) => snapshot.data()),
+    seasonId,
+  });
 
   if (!missingEntries.length) return false;
 

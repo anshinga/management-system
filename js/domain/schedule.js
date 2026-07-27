@@ -4,6 +4,40 @@ function encodeIdPart(value) {
   return encodeURIComponent(String(value));
 }
 
+function parseDateKey(dateKey) {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function formatDateKey(date) {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0"),
+  ].join("-");
+}
+
+function shiftDateKey(dateKey, days) {
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() + days);
+  return formatDateKey(date);
+}
+
+export function getSchedulePattern({ dateKey, slot }) {
+  if (!isDateKey(dateKey)) throw new Error("排課日期格式不正確。");
+  if (!isTimeValue(slot)) throw new Error("排課時間格式不正確。");
+  return {
+    sourceWeekday: parseDateKey(dateKey).getDay() || 7,
+    sourceSlot: slot,
+  };
+}
+
+export function makeSchedulePatternKey({ studentId, dateKey, slot }) {
+  if (!studentId) throw new Error("排課學生不可為空白。");
+  const pattern = getSchedulePattern({ dateKey, slot });
+  return `${studentId}\u0000${pattern.sourceWeekday}\u0000${pattern.sourceSlot}`;
+}
+
 export function makeScheduleEntryId({ dateKey, slot, studentId }) {
   if (!isDateKey(dateKey)) throw new Error("排課日期格式不正確。");
   if (!isTimeValue(slot)) throw new Error("排課時間格式不正確。");
@@ -25,6 +59,31 @@ export function makeScheduleOverrideId({
   return [weekStart, seasonId, studentId, sourceWeekday, sourceSlot]
     .map(encodeIdPart)
     .join("__");
+}
+
+export function buildCarryForwardEntries({
+  previousEntries = [],
+  currentEntries = [],
+  overrides = [],
+  seasonId,
+}) {
+  const existingEntryIds = new Set(currentEntries.map(makeScheduleEntryId));
+  const overriddenPatterns = new Set(overrides.map((value) => (
+    `${value.studentId}\u0000${value.sourceWeekday}\u0000${value.sourceSlot}`
+  )));
+
+  return previousEntries
+    .filter((entry) => entry?.studentId && entry?.dateKey && entry?.slot)
+    .map((entry) => ({
+      studentId: entry.studentId,
+      seasonId,
+      dateKey: shiftDateKey(entry.dateKey, 7),
+      slot: entry.slot,
+      sourcePattern: makeSchedulePatternKey(entry),
+    }))
+    .filter((entry) => !existingEntryIds.has(makeScheduleEntryId(entry))
+      && !overriddenPatterns.has(entry.sourcePattern))
+    .map(({ sourcePattern, ...entry }) => entry);
 }
 
 export function groupScheduleEntries(entries = []) {

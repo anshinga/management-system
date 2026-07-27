@@ -21,6 +21,16 @@ function validateStudent(student) {
   if (student.previousLessonDate && !isDateKey(student.previousLessonDate)) {
     throw new Error("上一次上課日期必須是有效日期。");
   }
+  if (student.previousLessonDate) {
+    if (!Number.isInteger(student.previousLessonTerm) || student.previousLessonTerm < 1) {
+      throw new Error("上一次上課期數必須是大於 0 的整數。");
+    }
+    if (!Number.isInteger(student.previousLessonNumber) || student.previousLessonNumber < 1 || student.previousLessonNumber > 24) {
+      throw new Error("上一次上課堂數必須是 1 到 24 的整數。");
+    }
+  } else if (student.previousLessonTerm !== 0 || student.previousLessonNumber !== 0) {
+    throw new Error("沒有上一次上課日期時，不可保留歷史期數或堂數。");
+  }
   if (!Number.isInteger(student.pendingPaymentCount) || student.pendingPaymentCount < 0) {
     throw new Error("待付款期數不可小於 0。");
   }

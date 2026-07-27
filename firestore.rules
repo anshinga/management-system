@@ -138,9 +138,43 @@ service cloud.firestore {
         && data.active is bool;
     }
 
+    function validPreviousLesson(data) {
+      return !data.keys().hasAny(["previousLessonDate", "previousLessonTerm", "previousLessonNumber"])
+        || (
+          data.previousLessonDate is string
+          && (
+            (
+              data.previousLessonDate == ""
+              && (
+                !data.keys().hasAny(["previousLessonTerm", "previousLessonNumber"])
+                || (
+                  data.keys().hasAll(["previousLessonTerm", "previousLessonNumber"])
+                  && data.previousLessonTerm == 0
+                  && data.previousLessonNumber == 0
+                )
+              )
+            )
+            || (
+              isDateKey(data.previousLessonDate)
+              && (
+                !data.keys().hasAny(["previousLessonTerm", "previousLessonNumber"])
+                || (
+                  data.keys().hasAll(["previousLessonTerm", "previousLessonNumber"])
+                  && data.previousLessonTerm is int
+                  && data.previousLessonTerm >= 1
+                  && data.previousLessonNumber is int
+                  && data.previousLessonNumber >= 1
+                  && data.previousLessonNumber <= 24
+                )
+              )
+            )
+          )
+        );
+    }
+
     function validStudent(data) {
       return data.keys().hasAll(["name", "grade", "currentLessonCount", "currentTerm", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
-        && data.keys().hasOnly(["name", "grade", "currentLessonCount", "currentTerm", "previousLessonDate", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["name", "grade", "currentLessonCount", "currentTerm", "previousLessonDate", "previousLessonTerm", "previousLessonNumber", "status", "pendingPaymentCount", "paymentPending", "createdAt", "updatedAt"])
         && data.name is string
         && data.name.size() > 0
         && data.name.size() <= 100
@@ -152,16 +186,7 @@ service cloud.firestore {
         && data.currentLessonCount <= 23
         && data.currentTerm is int
         && data.currentTerm >= 1
-        && (
-          !data.keys().hasAny(["previousLessonDate"])
-          || (
-            data.previousLessonDate is string
-            && (
-              data.previousLessonDate == ""
-              || isDateKey(data.previousLessonDate)
-            )
-          )
-        )
+        && validPreviousLesson(data)
         && data.status in ["active", "paused"]
         && data.pendingPaymentCount is int
         && data.pendingPaymentCount >= 0

@@ -20,6 +20,8 @@ describe("domain models", () => {
       currentLessonCount: 8,
       currentTerm: 2,
       previousLessonDate: "",
+      previousLessonTerm: 0,
+      previousLessonNumber: 0,
       status: "active",
       pendingPaymentCount: 0,
       paymentPending: false,
@@ -33,7 +35,11 @@ describe("domain models", () => {
       currentLessonCount: 8,
       currentTerm: 2,
       previousLessonDate: " 2026-07-20 ",
-    }).previousLessonDate).toBe("2026-07-20");
+    })).toMatchObject({
+      previousLessonDate: "2026-07-20",
+      previousLessonTerm: 0,
+      previousLessonNumber: 0,
+    });
   });
 
   test("付款輸入會正規化", () => {

@@ -73,7 +73,7 @@ async function startManagementSystem(user) {
       { renderRollCall, bindRollCall },
       { renderStudents, bindStudents },
       { renderSchedule, bindSchedule },
-      { renderRecords },
+      { renderRecords, bindRecords },
       { renderPayment, bindPayment },
       { subscribeToWorkspaceData },
       { ensureWorkspaceAccess, promoteStudentGradesIfNeeded },
@@ -125,6 +125,7 @@ async function startManagementSystem(user) {
         if (currentRoute === "roll-call") bindRollCall(app, state, refresh, showToast);
         if (currentRoute === "students") bindStudents(app, state, refresh, showToast);
         if (currentRoute === "schedule") bindSchedule(app, state, refresh, showToast);
+        if (currentRoute === "records") bindRecords(app, state);
         if (currentRoute === "payment") bindPayment(app, state, refresh, showToast);
         app.querySelector('[data-action="refresh"]')?.addEventListener("click", () => refresh(true));
       }

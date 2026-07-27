@@ -247,10 +247,28 @@ textarea.input { resize: vertical; }
 .record-row { align-items: stretch; display: flex; }
 .record-history { align-items: center; display: flex; gap: 8px; overflow-x: auto; padding: 10px 14px; }
 .record-item { border-left: 1px solid var(--line); min-width: 88px; padding: 0 12px; }
-.record-item.is-baseline { background: var(--gold-soft); border: 0; border-radius: 6px; min-width: 160px; padding: 8px 12px; }
+.record-item.is-baseline { background: var(--gold-soft); border: 0; border-radius: 6px; min-width: 88px; padding: 6px 10px; }
 .record-item.is-baseline .record-lesson { color: var(--gold-dark); }
+.record-item.is-carryover { background: var(--surface-alt); border: 0; border-radius: 6px; padding-block: 6px; }
 .record-date { color: var(--muted); display: block; font-size: 11px; }
 .record-lesson { display: block; font-weight: 600; margin-top: 3px; }
+.record-folder-button { white-space: nowrap; }
+.record-folder-grid { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.record-folder {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  color: var(--text);
+  display: flex;
+  gap: 12px;
+  padding: 18px;
+  text-align: left;
+}
+.record-folder:hover { border-color: var(--gold); }
+.record-folder-icon { font-size: 28px; }
+.record-folder strong, .record-folder small { display: block; }
+.record-folder small { color: var(--muted); margin-top: 3px; }
 .payment-list { display: grid; gap: 10px; }
 .payment-list h3 { margin-bottom: 4px; }
 .payment-history { margin-top: 30px; }
@@ -312,5 +330,6 @@ body.dark .schedule-student.is-present { background: #283b2d; border-color: #537
   .record-row { display: block; }
   .record-meta { border-bottom: 1px solid var(--line); }
   .record-item:first-child { border-left: 0; }
+  .record-folder-grid { grid-template-columns: 1fr; }
   .payment-row { align-items: start; flex-direction: column; gap: 12px; }
 }

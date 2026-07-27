@@ -1,4 +1,5 @@
 import { createStudent, updateStudent } from "../repositories/students-repository.js";
+import { resolvePreviousLessonFields } from "../domain/records.js";
 import { getStudent, getTodayDate } from "../store.js";
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
@@ -85,7 +86,7 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
     const submitButton = form.querySelector('[type="submit"]');
     submitButton.disabled = true;
     const data = new FormData(form);
-    const input = {
+    const baseInput = {
       ...(student || {}),
       name: data.get("name"),
       grade: Number(data.get("grade")),
@@ -97,6 +98,10 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
       paymentPending: Boolean(student?.paymentPending),
     };
     try {
+      const input = {
+        ...baseInput,
+        ...resolvePreviousLessonFields(student, baseInput, state.attendance),
+      };
       if (student) await updateStudent(student.id, input);
       else await createStudent(input);
       closeModal();

@@ -131,7 +131,7 @@ describe("Firestore Security Rules", () => {
     }));
   });
 
-  test("owner 可以保存合法的上一次上課日期，且不能保存錯誤格式", async () => {
+  test("owner 可以保存合法的舊資料快照，且不能保存不完整快照", async () => {
     const database = testEnvironment.authenticatedContext("owner-uid", {
       email: OWNER_EMAIL,
       email_verified: true,
@@ -139,10 +139,14 @@ describe("Firestore Security Rules", () => {
     const student = workspaceDocument(database, "students", "student-1");
     await assertSucceeds(updateDoc(student, {
       previousLessonDate: "2026-07-20",
+      previousLessonTerm: 1,
+      previousLessonNumber: 3,
       updatedAt: serverTimestamp(),
     }));
     await assertFails(updateDoc(student, {
-      previousLessonDate: "2026/07/20",
+      previousLessonDate: "2026-07-20",
+      previousLessonTerm: 1,
+      previousLessonNumber: 25,
       updatedAt: serverTimestamp(),
     }));
   });
@@ -154,6 +158,8 @@ describe("Firestore Security Rules", () => {
     }).firestore();
     await assertFails(updateDoc(workspaceDocument(database, "students", "student-1"), {
       previousLessonDate: "2026-07-20",
+      previousLessonTerm: 1,
+      previousLessonNumber: 3,
       updatedAt: serverTimestamp(),
     }));
   });
@@ -193,6 +199,11 @@ describe("Firestore Security Rules", () => {
   });
 
   test("teacher 新增點名時必須在同一交易更新學生堂數", async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(workspaceDocument(context.firestore(), "students", "student-1"), {
+        previousLessonDate: "2026-07-20",
+      });
+    });
     const database = testEnvironment.authenticatedContext("teacher-uid", {
       email: "teacher@example.com",
       email_verified: true,

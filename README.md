@@ -42,9 +42,12 @@ npm.cmd run test:rules
 完成測試、確認 Firebase 專案與登入帳號後：
 
 ```powershell
-npm.cmd run build
 npx.cmd firebase login
 npx.cmd firebase deploy
 ```
 
-部署會同時更新 Hosting、Firestore Rules 與 indexes。不要將 Service Account JSON、Token 或其他秘密資料加入版本控制；前端的 `firebaseConfig` 是 Firebase Web App 的公開識別設定，安全性仍以 Authentication 與 Security Rules 為準。
+`firebase deploy` 會先執行 Hosting 的 `predeploy`，自動執行 production build，再從 `dist` 部署；不需要手動執行 `npm run build`。部署也會同時更新 Firestore Rules 與 indexes。
+
+部署後若在瀏覽器原始碼看到 `./js/app.js`，代表部署時沒有使用本專案根目錄的 `firebase.json`；正確的 production HTML 會載入 `/assets/index-*.js`。
+
+不要將 Service Account JSON、Token 或其他秘密資料加入版本控制；前端的 `firebaseConfig` 是 Firebase Web App 的公開識別設定，安全性仍以 Authentication 與 Security Rules 為準。

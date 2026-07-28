@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f5f5f3" />
+    <title>MPM 上課時段登記</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./css/style.css" />
+    <link rel="stylesheet" href="./css/booking.css" />
+  </head>
+  <body class="booking-public-body">
+    <main class="booking-public-shell">
+      <header class="booking-public-brand">
+        <span class="brand-mark" aria-hidden="true">MPM</span>
+        <div><p class="eyebrow">數學課程管理</p><strong>上課時段登記</strong></div>
+      </header>
+      <section id="booking-public-app" aria-live="polite">
+        <div class="booking-public-card booking-loading" aria-busy="true">
+          <p class="eyebrow">正在載入</p>
+          <h1>確認學生專屬連結…</h1>
+          <p>請稍候，我們正在讀取可選時段與剩餘名額。</p>
+        </div>
+      </section>
+      <footer class="booking-public-footer">此頁面為學生專屬連結，請勿轉傳給其他人。</footer>
+    </main>
+    <script type="importmap">
+      {
+        "imports": {
+          "firebase/app": "https://www.gstatic.com/firebasejs/12.16.0/firebase-app.js",
+          "firebase/functions": "https://www.gstatic.com/firebasejs/12.16.0/firebase-functions.js"
+        }
+      }
+    </script>
+    <script type="module" src="./js/booking-app.js"></script>
+  </body>
+</html>
+

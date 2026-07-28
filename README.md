@@ -40,3 +40,28 @@ npx.cmd firebase deploy --only firestore
 ```
 
 不要重新執行 `firebase init hosting`，也不要將 Service Account JSON、Token 或其他秘密資料加入版本控制。前端的 `firebaseConfig` 是 Firebase Web App 的公開識別設定，安全性仍以 Authentication 與 Security Rules 為準。
+
+## 家長選課活動
+
+管理端的「選課活動」可建立固定週時段登記，發布時會為每位在籍學生產生專屬連結與 QR Code。家長在 `booking.html` 送出後，可信任的 Cloud Functions 會以交易檢查名額，並把整段期間的固定時段寫入 `scheduleEntries`。
+
+新增的 Firestore 集合如下：
+
+- `bookingCampaigns`：活動設定與狀態。
+- `bookingInvitations`：每位學生的私密代碼與填寫狀態。
+- `bookingSubmissions`：已確認的時段與本次建立的排課文件。
+- `bookingSlotCounters`：發布當下既有排課與後續登記名額。
+
+家長頁面不具有 Firestore 寫入權限；公開讀取與送出皆透過位於 `asia-east1` 的 callable functions。第一次上線前必須同時部署 Functions 與 Firestore Rules：
+
+```powershell
+npm.cmd install
+cd functions
+npm.cmd install
+cd ..
+npx.cmd firebase deploy --only functions,firestore
+```
+
+GitHub Pages 仍照原本流程發布 `index.html`、`booking.html`、`css/` 與 `js/`。若只更新 GitHub Pages、未部署 Functions 與 Rules，選課連結將無法讀取或送出。
+
+活動開放時會以當下既有排課計算可登記名額。為避免名額計數與實際排課不同，活動開放期間不要再人工增減該活動的日期與時段；如需調整，應先提前截止活動。

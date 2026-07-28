@@ -4,6 +4,8 @@ import { getUserErrorMessage } from "../js/ui/errors.js";
 describe("user-facing errors", () => {
   test("Firebase 權限錯誤不會直接顯示技術訊息", () => {
     expect(getUserErrorMessage({ code: "permission-denied" })).toBe("您沒有執行這項操作的權限。");
+    expect(getUserErrorMessage({ code: "functions/permission-denied" }))
+      .toBe("您沒有執行這項操作的權限。");
   });
 
   test("保留應用程式提供的可理解錯誤", () => {

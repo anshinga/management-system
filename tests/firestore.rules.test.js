@@ -434,6 +434,99 @@ describe("Firestore Security Rules", () => {
     await assertFails(updateDoc(payment, { note: "事後修改" }));
   });
 
+  test("老師可刪除點名紀錄，但必須在同一交易將學生堂數減一", async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(workspaceDocument(
+        context.firestore(),
+        "attendance",
+        "2026-07-27__16%3A30__student-1",
+      ), {
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "16:30",
+        arrivalTime: "16:28",
+        lessonNumber: 2,
+        term: 1,
+        recordedBy: "teacher-uid",
+        ...timestampFields(),
+      });
+    });
+    const database = testEnvironment.authenticatedContext("teacher-uid", {
+      email: "teacher@example.com",
+      email_verified: true,
+    }).firestore();
+    const student = workspaceDocument(database, "students", "student-1");
+    const attendance = workspaceDocument(
+      database,
+      "attendance",
+      "2026-07-27__16%3A30__student-1",
+    );
+    await assertFails(runTransaction(database, async (transaction) => {
+      transaction.delete(attendance);
+    }));
+    await assertSucceeds(runTransaction(database, async (transaction) => {
+      const studentSnapshot = await transaction.get(student);
+      transaction.delete(attendance);
+      transaction.update(student, {
+        currentLessonCount: studentSnapshot.data().currentLessonCount - 1,
+        updatedAt: serverTimestamp(),
+      });
+    }));
+  });
+
+  test("選課活動只允許老師建立草稿，學生專屬資料不可公開讀寫", async () => {
+    const teacherDatabase = testEnvironment.authenticatedContext("teacher-uid", {
+      email: "teacher@example.com",
+      email_verified: true,
+    }).firestore();
+    const viewerDatabase = testEnvironment.authenticatedContext("viewer-uid", {
+      email: "viewer@example.com",
+      email_verified: true,
+    }).firestore();
+    const campaign = workspaceDocument(
+      teacherDatabase,
+      "bookingCampaigns",
+      "campaign-2026-summer",
+    );
+    await assertSucceeds(setDoc(campaign, {
+      name: "2026 暑假選課",
+      seasonId: "summer-2026",
+      startDate: "2026-07-01",
+      endDate: "2026-08-31",
+      registrationDeadline: Timestamp.fromDate(new Date("2026-08-01T12:00:00Z")),
+      minChoices: 1,
+      maxChoices: 2,
+      capacity: 10,
+      availableSlots: ["1__15:00", "3__16:30"],
+      excludedDates: ["2026-08-08"],
+      status: "draft",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
+    await assertSucceeds(getDoc(campaign));
+    await assertFails(getDoc(workspaceDocument(
+      viewerDatabase,
+      "bookingCampaigns",
+      "campaign-2026-summer",
+    )));
+    await assertFails(setDoc(workspaceDocument(
+      teacherDatabase,
+      "bookingInvitations",
+      "private-token",
+    ), {
+      campaignId: "campaign-2026-summer",
+      studentId: "student-1",
+      status: "invited",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(getDoc(workspaceDocument(
+      testEnvironment.unauthenticatedContext().firestore(),
+      "bookingInvitations",
+      "private-token",
+    )));
+  });
+
   test("不合法的學生欄位會被拒絕", async () => {
     const database = testEnvironment.authenticatedContext("owner-uid", {
       email: OWNER_EMAIL,

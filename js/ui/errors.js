@@ -8,12 +8,13 @@ const firebaseMessages = {
 };
 
 export function getUserErrorMessage(error, fallback = "操作失敗，請稍後再試。") {
-  if (error?.code === "failed-precondition"
+  const code = String(error?.code || "").split("/").pop();
+  if (code === "failed-precondition"
     && typeof error?.message === "string"
     && /index|create_composite/i.test(error.message)) {
     return "雲端排課索引尚未就緒，請稍後再試。";
   }
-  if (firebaseMessages[error?.code]) return firebaseMessages[error.code];
+  if (firebaseMessages[code]) return firebaseMessages[code];
   if (typeof error?.message === "string" && error.message && !error.message.startsWith("FirebaseError:")) {
     return error.message;
   }

@@ -2,7 +2,7 @@ import { onSnapshot } from "firebase/firestore";
 import { groupScheduleEntries } from "../domain/schedule.js";
 import { COLLECTIONS, workspaceCollectionRef } from "./firestore-paths.js";
 
-const SUBSCRIBED_COLLECTIONS = [
+const CORE_COLLECTIONS = [
   COLLECTIONS.students,
   COLLECTIONS.seasons,
   COLLECTIONS.scheduleEntries,
@@ -12,6 +12,13 @@ const SUBSCRIBED_COLLECTIONS = [
   COLLECTIONS.payments,
 ];
 
+const BOOKING_COLLECTIONS = [
+  COLLECTIONS.bookingCampaigns,
+  COLLECTIONS.bookingInvitations,
+  COLLECTIONS.bookingSubmissions,
+  COLLECTIONS.bookingSlotCounters,
+];
+
 function snapshotDocuments(snapshot) {
   return snapshot.docs.map((document) => ({
     id: document.id,
@@ -19,9 +26,12 @@ function snapshotDocuments(snapshot) {
   }));
 }
 
-export function subscribeToWorkspaceData(onState, onError) {
-  const data = Object.fromEntries(SUBSCRIBED_COLLECTIONS.map((name) => [name, []]));
-  const metadata = Object.fromEntries(SUBSCRIBED_COLLECTIONS.map((name) => [
+export function subscribeToWorkspaceData(onState, onError, { includeBooking = false } = {}) {
+  const subscribedCollections = includeBooking
+    ? [...CORE_COLLECTIONS, ...BOOKING_COLLECTIONS]
+    : CORE_COLLECTIONS;
+  const data = Object.fromEntries(subscribedCollections.map((name) => [name, []]));
+  const metadata = Object.fromEntries(subscribedCollections.map((name) => [
     name,
     { ready: false, fromCache: false, hasPendingWrites: false },
   ]));
@@ -38,6 +48,10 @@ export function subscribeToWorkspaceData(onState, onError) {
       attendance: data.attendance,
       billingCycles: data.billingCycles,
       payments: data.payments,
+      bookingCampaigns: data.bookingCampaigns || [],
+      bookingInvitations: data.bookingInvitations || [],
+      bookingSubmissions: data.bookingSubmissions || [],
+      bookingSlotCounters: data.bookingSlotCounters || [],
       sync: {
         ready,
         revision,
@@ -47,7 +61,7 @@ export function subscribeToWorkspaceData(onState, onError) {
     });
   };
 
-  const unsubscribers = SUBSCRIBED_COLLECTIONS.map((name) => onSnapshot(
+  const unsubscribers = subscribedCollections.map((name) => onSnapshot(
     workspaceCollectionRef(name),
     { includeMetadataChanges: true },
     (snapshot) => {

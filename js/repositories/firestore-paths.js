@@ -11,6 +11,10 @@ export const COLLECTIONS = Object.freeze({
   attendance: "attendance",
   billingCycles: "billingCycles",
   payments: "payments",
+  bookingCampaigns: "bookingCampaigns",
+  bookingInvitations: "bookingInvitations",
+  bookingSubmissions: "bookingSubmissions",
+  bookingSlotCounters: "bookingSlotCounters",
   migrations: "migrations",
 });
 

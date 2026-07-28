@@ -66,6 +66,7 @@ async function startManagementSystem(user) {
       import("./views/schedule.js"),
       import("./views/records.js"),
       import("./views/payment.js"),
+      import("./views/booking-campaigns.js"),
       import("./repositories/workspace-data-repository.js"),
       import("./repositories/workspace-repository.js"),
     ]).then(([
@@ -75,6 +76,7 @@ async function startManagementSystem(user) {
       { renderSchedule, bindSchedule },
       { renderRecords, bindRecords },
       { renderPayment, bindPayment },
+      { renderBookingCampaigns, bindBookingCampaigns },
       { subscribeToWorkspaceData },
       { ensureWorkspaceAccess, promoteStudentGradesIfNeeded },
     ]) => {
@@ -84,6 +86,7 @@ async function startManagementSystem(user) {
       let currentRoute = "roll-call";
       let unsubscribeData = null;
       let lastRenderedRevision = -1;
+      let canManageBooking = false;
 
       function showToast(message) {
         const toast = document.querySelector("#toast");
@@ -121,17 +124,20 @@ async function startManagementSystem(user) {
               ? renderSchedule(state)
               : currentRoute === "records"
                 ? renderRecords(state)
-                : renderPayment(state);
+                : currentRoute === "payment"
+                  ? renderPayment(state)
+                  : renderBookingCampaigns(state);
         if (currentRoute === "roll-call") bindRollCall(app, state, refresh, showToast);
         if (currentRoute === "students") bindStudents(app, state, refresh, showToast);
         if (currentRoute === "schedule") bindSchedule(app, state, refresh, showToast);
         if (currentRoute === "records") bindRecords(app, state);
         if (currentRoute === "payment") bindPayment(app, state, refresh, showToast);
+        if (currentRoute === "booking") bindBookingCampaigns(app, state, refresh, showToast);
         app.querySelector('[data-action="refresh"]')?.addEventListener("click", () => refresh(true));
       }
 
       initRouter((route) => {
-        currentRoute = ["roll-call", "students", "schedule", "records", "payment"].includes(route)
+        currentRoute = ["roll-call", "students", "schedule", "records", "payment", "booking"].includes(route)
           ? route
           : "roll-call";
         refresh(true);
@@ -149,7 +155,16 @@ async function startManagementSystem(user) {
           state = null;
           lastRenderedRevision = -1;
           refresh(true);
-          await ensureWorkspaceAccess(authenticatedUser);
+          const member = await ensureWorkspaceAccess(authenticatedUser);
+          canManageBooking = ["owner", "teacher"].includes(member.role);
+          const bookingRouteButton = document.querySelector('[data-route="booking"]');
+          if (bookingRouteButton) bookingRouteButton.hidden = !canManageBooking;
+          if (!canManageBooking && currentRoute === "booking") {
+            currentRoute = "roll-call";
+          }
+          document.querySelectorAll("[data-route]").forEach((button) => {
+            button.classList.toggle("is-active", button.dataset.route === currentRoute);
+          });
           await promoteStudentGradesIfNeeded(authenticatedUser);
           await new Promise((resolve, reject) => {
             let settled = false;
@@ -169,7 +184,7 @@ async function startManagementSystem(user) {
               }
               storageStatus.textContent = "雲端同步失敗";
               showToast("雲端同步中斷，請檢查網路後重新整理");
-            });
+            }, { includeBooking: canManageBooking });
           });
         },
         disconnect() {

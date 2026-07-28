@@ -154,7 +154,7 @@ describe("固定雙月紀錄", () => {
     ]);
   });
 
-  test("舊資料格只顯示日期、期數與堂數", () => {
+  test("舊資料格只顯示日期與堂數", () => {
     const html = renderRecords({
       students: [{
         ...students[0],
@@ -166,19 +166,25 @@ describe("固定雙月紀錄", () => {
     }, { todayDate: "2026-07-27" });
 
     expect(html.indexOf("2026-07-20")).toBeLessThan(html.indexOf("2026-07-27"));
-    expect(html).toContain("第 1 期・第 7 堂");
+    expect(html).toContain("第 7 堂");
+    expect(html).not.toContain("第 1 期");
     expect(html).not.toContain("上一次上課");
     expect(html).not.toContain("舊資料起點");
   });
 
   test("資料夾與期間畫面只顯示對應紀錄", () => {
     const state = { students: [students[0]], attendance };
+    const current = renderRecords(state, { todayDate: "2026-07-27" });
     const folders = renderRecords(state, { view: "folders", todayDate: "2026-07-27" });
     const period = renderRecords(state, {
       view: "period",
       periodKey: "2026-05",
       todayDate: "2026-07-27",
     });
+    expect(current).toContain("record-folder-icon is-button");
+    expect(folders).toContain("record-folder-icon");
+    expect(current).not.toContain("📁");
+    expect(folders).not.toContain("📁");
     expect(folders).toContain("2026 年 5–6 月");
     expect(folders).toContain("2 筆紀錄");
     expect(period).toContain("2026-05-10");

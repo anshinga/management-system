@@ -257,7 +257,7 @@ textarea.input { resize: vertical; }
 .record-item.is-carryover { background: var(--surface-alt); border: 0; border-radius: 6px; padding-block: 6px; }
 .record-date { color: var(--muted); display: block; font-size: 11px; }
 .record-lesson { display: block; font-weight: 600; margin-top: 3px; }
-.record-folder-button { white-space: nowrap; }
+.record-folder-button { align-items: center; display: inline-flex; gap: 8px; white-space: nowrap; }
 .record-folder-grid { display: grid; gap: 12px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .record-folder {
   align-items: center;
@@ -271,7 +271,8 @@ textarea.input { resize: vertical; }
   text-align: left;
 }
 .record-folder:hover { border-color: var(--gold); }
-.record-folder-icon { font-size: 28px; }
+.record-folder-icon { color: var(--gold-dark); flex: 0 0 auto; height: 28px; width: 28px; }
+.record-folder-icon.is-button { height: 18px; width: 18px; }
 .record-folder strong, .record-folder small { display: block; }
 .record-folder small { color: var(--muted); margin-top: 3px; }
 .payment-list { display: grid; gap: 10px; }

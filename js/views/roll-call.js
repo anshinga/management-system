@@ -16,7 +16,10 @@ import {
   removeLatestAttendance,
   updateAttendanceTime,
 } from "../repositories/attendance-repository.js";
-import { ensureScheduleWeek } from "../repositories/schedule-repository.js";
+import {
+  addTemporaryScheduleEntries,
+  ensureScheduleWeek,
+} from "../repositories/schedule-repository.js";
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
 
@@ -34,7 +37,10 @@ export function renderRollCall(state, refresh) {
   const weekday = getWeekday(dateObject);
   const pageTitle = date === getTodayDate() ? "今日點名" : "歷史點名";
   const season = getSeasonForDate(state, date);
-  const todaySchedules = SCHEDULE_SLOTS.map((slot) => ({ slot, schedule: getSchedule(state, date, slot, season?.id) })).filter((item) => item.schedule);
+  const todaySchedules = SCHEDULE_SLOTS.map((slot) => ({
+    slot,
+    schedule: getSchedule(state, date, slot, season?.id) || { studentIds: [] },
+  }));
   const present = state.attendance.filter((item) => item.dateKey === date).length;
   const pending = state.billingCycles.filter((cycle) => cycle.status === "pending").length;
   const activeStudents = todaySchedules.flatMap(({ schedule }) => schedule.studentIds).filter((id, index, list) => list.indexOf(id) === index);
@@ -51,12 +57,16 @@ export function renderRollCall(state, refresh) {
       <div class="stat"><div class="stat-label">待繳費</div><div class="stat-value">${pending}</div><div class="stat-note">仍可正常點名</div></div>
     </div>
     <div class="class-list">
-      ${todaySchedules.length ? todaySchedules.map(({ slot, schedule }) => renderClass(state, date, slot, schedule, refresh)).join("") : '<div class="panel empty">今天沒有排課資料。</div>'}
+      ${todaySchedules.map(({ slot, schedule }) => renderClass(state, date, slot, schedule, refresh)).join("")}
     </div>`;
 }
 
 function renderClass(state, date, slot, schedule, refresh) {
-  return `<section class="class-section"><div class="class-heading"><h3>${slot}</h3><span>${schedule.studentIds.length} 人</span></div><div class="class-students">${schedule.studentIds.map((id) => renderStudent(state, date, slot, id, refresh)).join("")}</div></section>`;
+  return `<section class="class-section"><div class="class-heading"><h3>${slot}</h3><span>${schedule.studentIds.length} 人</span></div><div class="class-students">${schedule.studentIds.map((id) => renderStudent(state, date, slot, id, refresh)).join("")}${renderTemporaryStudentCard(slot)}</div></section>`;
+}
+
+function renderTemporaryStudentCard(slot) {
+  return `<button class="student-card temporary-student-card" data-action="add-temporary-students" data-slot="${escapeAttribute(slot)}" type="button"><span class="temporary-student-icon" aria-hidden="true">＋</span><span><strong>新增臨時學生</strong><small>只加入本日，不會立即點名</small></span></button>`;
 }
 
 function renderStudent(state, date, slot, id, refresh) {
@@ -68,6 +78,80 @@ function renderStudent(state, date, slot, id, refresh) {
 
 function closeAttendanceModal(backdrop) {
   backdrop?.remove();
+}
+
+function openTemporaryStudentModal(app, state, {
+  dateKey,
+  slot,
+  seasonId,
+}, showToast) {
+  const scheduledStudentIds = new Set(getSchedule(state, dateKey, slot, seasonId)?.studentIds || []);
+  const availableStudents = state.students
+    .filter((student) => student.status === "active" && !scheduledStudentIds.has(student.id))
+    .sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name, "zh-Hant"));
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const modal = document.createElement("section");
+  modal.className = "modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-labelledby", "temporary-student-title");
+  modal.innerHTML = `<form class="modal-form" data-temporary-student-form><div class="modal-head"><div><h3 id="temporary-student-title">新增臨時學生</h3><p class="student-subtitle">${escapeHtml(`${dateKey}・${slot}`)}，只新增排課，不會立即點名。</p></div><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="field"><label for="temporary-student-search">搜尋學生</label><input class="input" id="temporary-student-search" type="search" autocomplete="off" placeholder="輸入學生姓名" /></div><div class="checkbox-list temporary-student-list" data-temporary-student-list>${availableStudents.map((student) => `<label class="checkbox-item temporary-student-option" data-search-text="${escapeAttribute(`${student.name}${student.grade}`)}"><input type="checkbox" name="studentIds" value="${escapeAttribute(student.id)}" /><span><strong>${escapeHtml(student.name)}</strong><small>${student.grade} 年級・第 ${student.currentLessonCount} / 24 堂</small></span></label>`).join("")}</div><p class="panel empty temporary-student-empty" data-temporary-student-empty ${availableStudents.length ? "hidden" : ""}>沒有可加入的學生。</p><div class="temporary-student-selection" data-temporary-student-selection>已選取 0 位</div><div class="form-actions"><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit" disabled>加入學生</button></div></form>`;
+  backdrop.append(modal);
+  app.append(backdrop);
+
+  const form = modal.querySelector("[data-temporary-student-form]");
+  const search = modal.querySelector("#temporary-student-search");
+  const options = [...modal.querySelectorAll(".temporary-student-option")];
+  const empty = modal.querySelector("[data-temporary-student-empty]");
+  const selection = modal.querySelector("[data-temporary-student-selection]");
+  const submitButton = form.querySelector('[type="submit"]');
+  const close = () => closeAttendanceModal(backdrop);
+  const updateSelection = () => {
+    const selectedCount = form.querySelectorAll('input[name="studentIds"]:checked').length;
+    selection.textContent = `已選取 ${selectedCount} 位`;
+    submitButton.disabled = selectedCount === 0;
+  };
+
+  modal.querySelector("[data-close-modal]").addEventListener("click", close);
+  modal.querySelector("[data-cancel]").addEventListener("click", close);
+  modal.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") close();
+  });
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+  search.addEventListener("input", (event) => {
+    const query = event.target.value.trim().toLocaleLowerCase();
+    let visibleCount = 0;
+    options.forEach((option) => {
+      const matches = !query || (option.dataset.searchText || "").toLocaleLowerCase().includes(query);
+      option.hidden = !matches;
+      if (matches) visibleCount += 1;
+    });
+    empty.hidden = visibleCount > 0;
+  });
+  form.addEventListener("change", updateSelection);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const studentIds = [...form.querySelectorAll('input[name="studentIds"]:checked')]
+      .map((input) => input.value);
+    if (!studentIds.length) return;
+    submitButton.disabled = true;
+    try {
+      const addedCount = await addTemporaryScheduleEntries(studentIds, {
+        dateKey,
+        slot,
+        seasonId,
+      });
+      close();
+      showToast(`已加入 ${addedCount} 位臨時學生，尚未點名`);
+    } catch (error) {
+      submitButton.disabled = false;
+      showToast(getUserErrorMessage(error, "臨時學生加入失敗"));
+    }
+  });
+  search.focus();
 }
 
 function openNewAttendanceModal(app, student, dateKey, slot, showToast) {
@@ -176,4 +260,17 @@ export function bindRollCall(app, state, refresh, showToast) {
     const record = state.attendance.find((item) => item.id === button.dataset.attendanceId);
     if (record) openAttendanceModal(app, state, record, showToast);
   }));
+  app.querySelectorAll('[data-action="add-temporary-students"]').forEach((button) => {
+    button.addEventListener("click", () => {
+      if (!selectedSeason?.id) {
+        showToast("找不到這個日期所屬的排課時段");
+        return;
+      }
+      openTemporaryStudentModal(app, state, {
+        dateKey: selectedDate,
+        slot: button.dataset.slot,
+        seasonId: selectedSeason.id,
+      }, showToast);
+    });
+  });
 }

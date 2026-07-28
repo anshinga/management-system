@@ -136,6 +136,10 @@ textarea.input { resize: vertical; }
 .class-students { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
 .student-card { align-items: center; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 12px 14px; }
 .student-card.is-present { background: #f2f8f2; border-color: #b8d4be; }
+.temporary-student-card { background: transparent; border-style: dashed; color: var(--muted); cursor: pointer; justify-content: flex-start; text-align: left; }
+.temporary-student-card:hover { background: var(--surface-alt); border-color: var(--gold); color: var(--gold-dark); }
+.temporary-student-card small { display: block; font-size: 11px; font-weight: 400; margin-top: 2px; }
+.temporary-student-icon { align-items: center; background: var(--gold-soft); border-radius: 50%; color: var(--gold-dark); display: inline-flex; flex: 0 0 auto; font-size: 20px; height: 34px; justify-content: center; width: 34px; }
 .student-summary { gap: 10px; min-width: 0; }
 .student-name { font-weight: 600; }
 .student-subtitle { color: var(--muted); font-size: 12px; }
@@ -289,6 +293,12 @@ textarea.input { resize: vertical; }
 .modal-form .form-actions { justify-content: flex-end; }
 .checkbox-list { display: grid; gap: 8px; grid-template-columns: repeat(2, 1fr); margin-bottom: 18px; }
 .checkbox-item { align-items: center; background: var(--surface-alt); border: 1px solid var(--line); border-radius: 6px; display: flex; gap: 8px; padding: 8px; }
+.temporary-student-list { max-height: 320px; overflow-y: auto; padding-right: 4px; }
+.temporary-student-option { cursor: pointer; min-width: 0; }
+.temporary-student-option[hidden], .temporary-student-empty[hidden] { display: none; }
+.temporary-student-option span { display: grid; min-width: 0; }
+.temporary-student-option small { color: var(--muted); font-size: 11px; }
+.temporary-student-selection { color: var(--muted); font-size: 13px; }
 .toast { background: var(--text); border-radius: 7px; bottom: 22px; color: white; left: 50%; opacity: 0; padding: 10px 15px; pointer-events: none; position: fixed; transform: translate(-50%, 12px); transition: opacity .2s, transform .2s; z-index: 20; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 body.dark { --bg: #1d1e1b; --surface: #282925; --surface-alt: #22231f; --text: #f2f1e9; --muted: #a8a99e; --line: #464740; --gold-soft: #4c401d; --success: #8fc29a; --warning: #e1a56f; }
@@ -306,6 +316,7 @@ body.dark .schedule-student.is-present { background: #283b2d; border-color: #537
   .stat { padding: 12px; }
   .stat-value { font-size: 22px; }
   .student-card { align-items: start; flex-direction: column; }
+  .temporary-student-card { align-items: center; flex-direction: row; }
   .class-students { grid-template-columns: 1fr; }
   .attendance-actions { align-self: stretch; justify-content: space-between; }
   .form-grid { grid-template-columns: 1fr 1fr; }
@@ -314,6 +325,7 @@ body.dark .schedule-student.is-present { background: #283b2d; border-color: #537
   .modal { padding: 16px; }
   .modal-form-grid { grid-template-columns: 1fr; }
   .modal-form-grid .field-wide { grid-column: auto; }
+  .checkbox-list { grid-template-columns: 1fr; }
   .week-toolbar { flex-wrap: wrap; }
   .week-title { order: 1; width: calc(100% - 100px); }
   .week-toolbar [data-action="current-week"] { margin-left: auto; order: 2; }

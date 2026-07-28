@@ -235,11 +235,12 @@ service cloud.firestore {
 
     function validScheduleEntry(data) {
       return data.keys().hasAll(["studentId", "seasonId", "dateKey", "slot", "createdAt", "updatedAt"])
-        && data.keys().hasOnly(["studentId", "seasonId", "dateKey", "slot", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "seasonId", "dateKey", "slot", "temporary", "createdAt", "updatedAt"])
         && isSafeDocumentId(data.studentId)
         && isSafeDocumentId(data.seasonId)
         && isDateKey(data.dateKey)
-        && isTimeValue(data.slot);
+        && isTimeValue(data.slot)
+        && (!data.keys().hasAny(["temporary"]) || data.temporary is bool);
     }
 
     function validScheduleOverride(data) {

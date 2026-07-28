@@ -48,6 +48,7 @@ describe("schedule domain", () => {
         { studentId: "s1", seasonId: "summer", dateKey: "2026-07-27", slot: "16:30" },
         { studentId: "s2", seasonId: "summer", dateKey: "2026-07-28", slot: "18:00" },
         { studentId: "s3", seasonId: "summer", dateKey: "2026-07-29", slot: "19:00" },
+        { studentId: "s4", seasonId: "summer", dateKey: "2026-07-30", slot: "15:00", temporary: true },
       ],
       currentEntries: [
         { studentId: "s1", seasonId: "summer", dateKey: "2026-08-03", slot: "16:30" },
@@ -83,6 +84,28 @@ describe("schedule domain", () => {
         studentIds: ["s2"],
       },
     ]);
+  });
+
+  test("臨時排課會保留在當日分組，但不會沿用到下一週", () => {
+    const temporaryEntry = {
+      studentId: "s1",
+      seasonId: "summer",
+      dateKey: "2026-07-27",
+      slot: "16:30",
+      temporary: true,
+    };
+    expect(buildCarryForwardEntries({
+      previousEntries: [temporaryEntry],
+      seasonId: "summer",
+    })).toEqual([]);
+    expect(groupScheduleEntries([temporaryEntry])).toEqual([{
+      id: "summer-2026-07-27-16:30",
+      season: "summer",
+      date: "2026-07-27",
+      slot: "16:30",
+      studentIds: ["s1"],
+      temporaryStudentIds: ["s1"],
+    }]);
   });
 
   test("錯誤日期或時間不會產生文件 ID", () => {

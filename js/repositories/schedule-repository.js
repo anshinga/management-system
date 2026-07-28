@@ -33,12 +33,18 @@ function overrideReference(value) {
   return workspaceDocumentRef(COLLECTIONS.scheduleOverrides, makeScheduleOverrideId(overrideData(value)));
 }
 
-function entryData({ studentId, seasonId, dateKey, slot }) {
-  return { studentId, seasonId, dateKey, slot };
+function entryData({ studentId, seasonId, dateKey, slot, temporary = false }) {
+  return {
+    studentId,
+    seasonId,
+    dateKey,
+    slot,
+    ...(temporary ? { temporary: true } : {}),
+  };
 }
 
 async function getFuturePatternEntries(studentId, sourceData) {
-  if (!sourceData) return [];
+  if (!sourceData || sourceData.temporary === true) return [];
   const currentWeekStart = getWeekStart(parseDate(sourceData.dateKey));
   const currentWeekEnd = formatDate(addDays(currentWeekStart, 6));
   const sourcePattern = getSchedulePattern(sourceData);
@@ -110,12 +116,18 @@ export async function moveScheduleEntry(studentId, source, target) {
     throw new Error("缺少排課移動所需資料。");
   }
 
-  const targetData = entryData({ studentId, ...target });
-  const targetRef = entryReference(targetData);
   const sourceData = source ? entryData({ studentId, ...source }) : null;
+  const targetData = entryData({
+    studentId,
+    ...target,
+    temporary: sourceData?.temporary === true,
+  });
+  const targetRef = entryReference(targetData);
   const sourceRef = sourceData ? entryReference(sourceData) : null;
   if (sourceRef?.path === targetRef.path) return;
-  const sourceOverrideRef = sourceData ? overrideReference(sourceData) : null;
+  const sourceOverrideRef = sourceData && sourceData.temporary !== true
+    ? overrideReference(sourceData)
+    : null;
   const futureOperations = await getFutureMoveOperations(studentId, sourceData, targetData);
   const references = [...new Map([
     targetRef,
@@ -174,13 +186,15 @@ export async function removeScheduleEntry(studentId, source) {
 
   const sourceData = entryData({ studentId, ...source });
   const sourceRef = entryReference(sourceData);
-  const sourceOverrideRef = overrideReference(sourceData);
+  const sourceOverrideRef = sourceData.temporary === true ? null : overrideReference(sourceData);
   const futureEntries = await getFuturePatternEntries(studentId, sourceData);
   const references = [...new Map([
     sourceRef,
     sourceOverrideRef,
     ...futureEntries.map(({ snapshot }) => snapshot.ref),
-  ].map((reference) => [reference.path, reference])).values()];
+  ]
+    .filter(Boolean)
+    .map((reference) => [reference.path, reference])).values()];
 
   await runTransaction(db, async (transaction) => {
     const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
@@ -191,6 +205,7 @@ export async function removeScheduleEntry(studentId, source) {
       if (snapshotByPath.get(snapshot.ref.path)?.exists()) transaction.delete(snapshot.ref);
     });
 
+    if (!sourceOverrideRef) return;
     const overrideSnapshot = snapshotByPath.get(sourceOverrideRef.path);
     if (overrideSnapshot?.exists()) {
       transaction.update(sourceOverrideRef, { updatedAt: serverTimestamp() });
@@ -201,6 +216,35 @@ export async function removeScheduleEntry(studentId, source) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
+  });
+}
+
+export async function addTemporaryScheduleEntries(studentIds, target) {
+  const uniqueStudentIds = [...new Set(studentIds)].filter(Boolean);
+  if (!uniqueStudentIds.length || !target?.dateKey || !target?.slot || !target?.seasonId) {
+    throw new Error("請選擇至少一位臨時學生。");
+  }
+
+  const entries = uniqueStudentIds.map((studentId) => entryData({
+    studentId,
+    ...target,
+    temporary: true,
+  }));
+  const references = entries.map(entryReference);
+
+  return runTransaction(db, async (transaction) => {
+    const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
+    let addedCount = 0;
+    snapshots.forEach((snapshot, index) => {
+      if (snapshot.exists()) return;
+      addedCount += 1;
+      transaction.set(references[index], {
+        ...entries[index],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    });
+    return addedCount;
   });
 }
 

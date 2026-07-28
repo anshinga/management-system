@@ -185,6 +185,24 @@ describe("Firestore Security Rules", () => {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }));
+    await assertSucceeds(setDoc(workspaceDocument(database, "scheduleEntries", "2026-07-28__18%3A00__student-1"), {
+      studentId: "student-1",
+      seasonId: "summer-2026",
+      dateKey: "2026-07-28",
+      slot: "18:00",
+      temporary: true,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(setDoc(workspaceDocument(database, "scheduleEntries", "2026-07-29__19%3A30__student-1"), {
+      studentId: "student-1",
+      seasonId: "summer-2026",
+      dateKey: "2026-07-29",
+      slot: "19:30",
+      temporary: "yes",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
     await assertSucceeds(setDoc(workspaceDocument(database, "scheduleOverrides", "2026-07-27__summer-2026__student-1__1__16%3A30"), {
       studentId: "student-1",
       seasonId: "summer-2026",

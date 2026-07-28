@@ -73,7 +73,7 @@ export function buildCarryForwardEntries({
   )));
 
   return previousEntries
-    .filter((entry) => entry?.studentId && entry?.dateKey && entry?.slot)
+    .filter((entry) => entry?.studentId && entry?.dateKey && entry?.slot && entry.temporary !== true)
     .map((entry) => ({
       studentId: entry.studentId,
       seasonId,
@@ -102,6 +102,12 @@ export function groupScheduleEntries(entries = []) {
     }
     const cell = cells.get(key);
     if (!cell.studentIds.includes(entry.studentId)) cell.studentIds.push(entry.studentId);
+    if (entry.temporary === true) {
+      if (!cell.temporaryStudentIds) cell.temporaryStudentIds = [];
+      if (!cell.temporaryStudentIds.includes(entry.studentId)) {
+        cell.temporaryStudentIds.push(entry.studentId);
+      }
+    }
   });
   return [...cells.values()].sort((a, b) => a.date.localeCompare(b.date) || a.slot.localeCompare(b.slot));
 }

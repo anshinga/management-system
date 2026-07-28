@@ -10,12 +10,14 @@ describe("domain models", () => {
   test("學生輸入會轉成固定資料型態", () => {
     expect(normalizeStudentInput({
       name: "  王小明 ",
+      note: "  課後提醒 ",
       grade: "5",
       lessonCount: "8",
       term: "2",
       status: "active",
     })).toEqual({
       name: "王小明",
+      note: "課後提醒",
       grade: 5,
       currentLessonCount: 8,
       currentTerm: 2,

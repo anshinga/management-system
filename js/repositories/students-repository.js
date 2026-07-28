@@ -4,11 +4,12 @@ import {
   setDoc,
   updateDoc,
 } from "firebase/firestore";
-import { isDateKey, normalizeStudentInput } from "../domain/models.js";
+import { isDateKey, normalizeStudentInput, normalizeText } from "../domain/models.js";
 import { COLLECTIONS, workspaceCollectionRef, workspaceDocumentRef } from "./firestore-paths.js";
 
 function validateStudent(student) {
   if (!student.name) throw new Error("請輸入學生姓名。");
+  if (student.note.length > 1000) throw new Error("學生備註不可超過 1000 字。");
   if (!Number.isInteger(student.grade) || student.grade < 1 || student.grade > 20) {
     throw new Error("年級必須是 1 到 20 的整數。");
   }
@@ -56,6 +57,15 @@ export async function updateStudent(studentId, input) {
   validateStudent(student);
   await updateDoc(workspaceDocumentRef(COLLECTIONS.students, studentId), {
     ...student,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateStudentNote(studentId, note) {
+  const normalizedNote = normalizeText(note);
+  if (normalizedNote.length > 1000) throw new Error("學生備註不可超過 1000 字。");
+  await updateDoc(workspaceDocumentRef(COLLECTIONS.students, studentId), {
+    note: normalizedNote,
     updatedAt: serverTimestamp(),
   });
 }

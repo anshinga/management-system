@@ -9,6 +9,7 @@ export function normalizeText(value) {
 export function normalizeStudentInput(input = {}) {
   return {
     name: normalizeText(input.name),
+    note: normalizeText(input.note),
     grade: Number(input.grade),
     currentLessonCount: Number(input.currentLessonCount ?? input.lessonCount ?? 0),
     currentTerm: Number(input.currentTerm ?? input.term ?? 1),

@@ -143,10 +143,18 @@ describe("Firestore Security Rules", () => {
       previousLessonNumber: 3,
       updatedAt: serverTimestamp(),
     }));
+    await assertSucceeds(updateDoc(student, {
+      note: "學生備註",
+      updatedAt: serverTimestamp(),
+    }));
     await assertFails(updateDoc(student, {
       previousLessonDate: "2026-07-20",
       previousLessonTerm: 1,
       previousLessonNumber: 25,
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(student, {
+      note: "x".repeat(1001),
       updatedAt: serverTimestamp(),
     }));
   });

@@ -139,6 +139,7 @@ textarea.input { resize: vertical; }
 .student-summary { gap: 10px; min-width: 0; }
 .student-name { font-weight: 600; }
 .student-subtitle { color: var(--muted); font-size: 12px; }
+.student-note-summary { color: var(--muted); font-size: 12px; margin-top: 3px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grade-badge, .status-badge, .pending-badge {
   border-radius: 99px;
   display: inline-flex;

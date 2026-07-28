@@ -25,6 +25,13 @@ describe("學生管理", () => {
     const html = renderStudents({ students }, { sort: "lessons-desc" });
     expect(html).toContain('value="lessons-desc" selected');
   });
+
+  test("學生備註會顯示摘要並出現在編輯表單", () => {
+    const html = renderStudents({
+      students: [{ ...students[0], note: "這是一段學生備註" }],
+    });
+    expect(html).toContain("這是一段學生備註");
+  });
 });
 
 describe("舊資料快照", () => {

@@ -105,6 +105,28 @@ describe("schedule view", () => {
     expect(html).not.toContain(">21:00<");
   });
 
+  test("過去已有點名的時段與學生會保持綠色及鎖定", () => {
+    const attendedState = {
+      ...state,
+      attendance: [{
+        id: "2026-07-29__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-29",
+        slot: "15:00",
+        arrivalTime: "14:55",
+        lessonNumber: 1,
+        term: 1,
+      }],
+    };
+    const html = renderSchedule(attendedState);
+
+    expect(html).toContain("綠色標示為已有點名紀錄，無法調整");
+    expect(html).toContain('class="schedule-cell has-attendance" data-date="2026-07-29"');
+    expect(html).toContain("已到 1");
+    expect(html).toContain("schedule-student is-present is-locked");
+    expect(html).toContain('aria-disabled="true" title="已簽到，無法調整排課"');
+  });
+
   test("鉛筆按鈕會切換刪除模式並顯示移除操作", () => {
     let html = renderSchedule(state);
     expect(html).toContain("✎");

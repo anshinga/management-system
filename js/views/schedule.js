@@ -44,18 +44,36 @@ export function renderSchedule(state) {
   const season = getSeasonForDate(state, weekDates[0]);
   const activeStudents = [...state.students].filter((student) => student.status === "active").sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name, "zh-Hant"));
   const filteredStudents = activeStudents.filter((student) => !scheduleSearch || `${student.name}${student.grade}`.includes(scheduleSearch));
-  const groupedStudents = [...new Set(filteredStudents.map((student) => student.grade))].sort((a, b) => a - b).map((grade) => ({ grade, students: filteredStudents.filter((student) => student.grade === grade) }));
+  const groupedStudents = [...new Set(activeStudents.map((student) => student.grade))].sort((a, b) => a - b).map((grade) => ({ grade, students: activeStudents.filter((student) => student.grade === grade) }));
 
   return `<div class="page-head"><div><p class="eyebrow">${escapeHtml(season?.name || "目前時段")}</p><h2>排課</h2><p>每週獨立保存日期，下一週首次開啟時會沿用前一週排課。<br>目前顯示 ${attendanceDate} 的到班標示${deletionMode ? '<br><span class="delete-mode-hint">刪除模式：點選學生卡片上的 ×，將從本週起移除。</span>' : ""}</p></div><button class="button-secondary schedule-edit-button${deletionMode ? " is-active" : ""}" data-action="toggle-delete-mode" type="button" aria-pressed="${deletionMode}"><span aria-hidden="true">${deletionMode ? "✓" : "✎"}</span> ${deletionMode ? "完成" : "修改排課"}</button></div>
     <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週">‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(weekDates[5])} ${weekdays[5]}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(weekDates[5])}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週">›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
-    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot)).join("")}`).join("")}</div></div></section></div>`;
+    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span data-palette-count>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot)).join("")}`).join("")}</div></div></section></div>`;
 }
 
 function renderPaletteStudent(student) {
   const interactiveAttributes = deletionMode
     ? 'draggable="false" aria-disabled="true"'
     : `draggable="true" tabindex="0" role="button" aria-label="選取 ${escapeAttribute(student.name)} 進行排課"`;
-  return `<div class="drag-student palette-student" ${interactiveAttributes} data-drag-student="${escapeAttribute(student.id)}" data-drag-source="palette"><span>${escapeHtml(student.name)}</span></div>`;
+  return `<div class="drag-student palette-student" ${interactiveAttributes} data-drag-student="${escapeAttribute(student.id)}" data-drag-source="palette" data-search-text="${escapeAttribute(`${student.name}${student.grade}`)}"><span>${escapeHtml(student.name)}</span></div>`;
+}
+
+function applyScheduleSearch(app) {
+  const query = scheduleSearch.toLocaleLowerCase();
+  const paletteStudents = [...app.querySelectorAll(".palette-student")];
+  let visibleCount = 0;
+
+  paletteStudents.forEach((student) => {
+    const matches = !query || (student.dataset.searchText || "").toLocaleLowerCase().includes(query);
+    student.hidden = !matches;
+    if (matches) visibleCount += 1;
+  });
+
+  app.querySelectorAll(".palette-group").forEach((group) => {
+    group.hidden = ![...group.querySelectorAll(".palette-student")].some((student) => !student.hidden);
+  });
+  const count = app.querySelector("[data-palette-count]");
+  if (count) count.textContent = `${visibleCount} / ${paletteStudents.length} 位`;
 }
 
 function renderScheduledStudent(student, {
@@ -122,14 +140,10 @@ export function bindSchedule(app, state, refresh, showToast) {
     refresh();
   });
   app.querySelectorAll('[data-action="toggle-palette"]').forEach((button) => button.addEventListener("click", () => { paletteCollapsed = !paletteCollapsed; refresh(); }));
+  applyScheduleSearch(app);
   app.querySelector("#schedule-search")?.addEventListener("input", (event) => {
-    const cursor = event.target.selectionStart;
     scheduleSearch = event.target.value.trim();
-    refresh();
-    requestAnimationFrame(() => {
-      const nextInput = app.querySelector("#schedule-search");
-      if (nextInput) { nextInput.focus(); nextInput.setSelectionRange(cursor, cursor); }
-    });
+    applyScheduleSearch(app);
   });
   app.querySelectorAll('[data-action="remove-schedule-student"]').forEach((button) => {
     button.addEventListener("click", async () => {

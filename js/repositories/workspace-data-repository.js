@@ -36,6 +36,7 @@ export function subscribeToWorkspaceData(onState, onError, { includeBooking = fa
     { ready: false, fromCache: false, hasPendingWrites: false },
   ]));
   let revision = 0;
+  let bookingError = null;
 
   const emit = () => {
     const ready = Object.values(metadata).every((value) => value.ready);
@@ -52,6 +53,10 @@ export function subscribeToWorkspaceData(onState, onError, { includeBooking = fa
       bookingInvitations: data.bookingInvitations || [],
       bookingSubmissions: data.bookingSubmissions || [],
       bookingSlotCounters: data.bookingSlotCounters || [],
+      booking: {
+        available: includeBooking && bookingError == null,
+        errorCode: bookingError?.code || "",
+      },
       sync: {
         ready,
         revision,
@@ -75,7 +80,21 @@ export function subscribeToWorkspaceData(onState, onError, { includeBooking = fa
       };
       emit();
     },
-    onError,
+    (error) => {
+      if (!BOOKING_COLLECTIONS.includes(name)) {
+        onError(error);
+        return;
+      }
+      bookingError = error;
+      data[name] = [];
+      metadata[name] = {
+        ready: true,
+        fromCache: false,
+        hasPendingWrites: false,
+      };
+      revision += 1;
+      emit();
+    },
   ));
 
   return () => unsubscribers.forEach((unsubscribe) => unsubscribe());

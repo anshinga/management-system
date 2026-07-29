@@ -127,12 +127,15 @@ beforeEach(() => {
 describe("schedule view", () => {
   test("左上角會顯示可切換的四個時期", () => {
     const html = renderSchedule(allSeasonState);
+    expect(html).toContain('<div class="schedule-title-row"><h2>排課</h2><div class="schedule-season-switcher"');
     expect(html).toContain("2026 暑假");
     expect(html).toContain("2026 上學期");
     expect(html).toContain("2027 寒假");
     expect(html).toContain("2027 下學期");
     expect(html.match(/data-action="switch-schedule-season"/g)).toHaveLength(4);
     expect(html).toContain('id="schedule-season-select"');
+    expect(html).not.toContain("每週獨立保存日期");
+    expect(html).not.toContain("綠色標示為已有點名紀錄");
   });
 
   test("目前時期跳到今天，其他時期跳到開始日期", () => {
@@ -171,7 +174,6 @@ describe("schedule view", () => {
     };
     const html = renderSchedule(attendedState);
 
-    expect(html).toContain("綠色標示為已有點名紀錄，無法調整");
     expect(html).toContain('class="schedule-cell has-attendance" data-date="2026-07-29"');
     expect(html).toContain("已到 1");
     expect(html).toContain("schedule-student is-present is-locked");
@@ -190,7 +192,7 @@ describe("schedule view", () => {
     }, vi.fn());
     app.toggleButton.click();
 
-    expect(html).toContain("刪除模式");
+    expect(html).toContain("schedule-editor is-delete-mode");
     expect(html).toContain("完成");
     expect(html).toContain('data-action="remove-schedule-student"');
 

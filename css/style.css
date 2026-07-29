@@ -184,15 +184,16 @@ textarea.input { resize: vertical; }
 .name-chip { background: var(--gold-soft); border-radius: 5px; color: var(--gold-dark); font-size: 12px; padding: 3px 6px; }
 .cell-edit { background: transparent; border: 0; color: var(--muted); font-size: 12px; margin-top: 10px; padding: 0; }
 .cell-edit:hover { color: var(--gold-dark); }
-.week-toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 18px; }
-.schedule-season-switcher { margin-bottom: 18px; max-width: 100%; }
+.week-toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 12px; }
+.schedule-page-head { align-items: center; margin-bottom: 14px; }
+.schedule-title-row { align-items: center; display: flex; flex: 1; gap: 18px; min-width: 0; }
+.schedule-title-row h2 { flex: 0 0 auto; margin: 0; }
+.schedule-season-switcher { min-width: 0; }
 .schedule-season-buttons {
-  border-bottom: 1px solid var(--line);
   display: flex;
   gap: 6px;
   max-width: 100%;
   overflow-x: auto;
-  padding-bottom: 8px;
 }
 .schedule-season-button {
   background: transparent;
@@ -402,8 +403,12 @@ body.dark .schedule-student.is-present { background: #283b2d; border-color: #537
   .modal-form-grid .field-wide { grid-column: auto; }
   .checkbox-list { grid-template-columns: 1fr; }
   .week-toolbar { flex-wrap: wrap; }
+  .schedule-page-head { align-items: center; flex-direction: row; }
+  .schedule-title-row { flex: 1; gap: 12px; }
+  .schedule-title-row h2 { font-size: 26px; }
   .schedule-season-buttons { display: none; }
-  .schedule-season-select-label { display: block; }
+  .schedule-season-select-label { align-items: center; display: flex; gap: 7px; }
+  .schedule-season-select-label span { display: none; }
   .schedule-season-select-label .select { width: 100%; }
   .week-title { order: 1; width: calc(100% - 100px); }
   .week-toolbar [data-action="current-week"] { margin-left: auto; order: 2; }

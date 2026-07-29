@@ -60,9 +60,9 @@ export function renderRollCall(state, refresh) {
   const activeStudents = todaySchedules.flatMap(({ schedule }) => schedule.studentIds).filter((id, index, list) => list.indexOf(id) === index);
 
   return `
-    <div class="page-head">
+    <div class="page-head roll-call-page-head">
       <div class="date-control"><label for="attendance-date">點名日期</label><input class="input" id="attendance-date" type="date" value="${date}" max="${getTodayDate()}" /></div>
-      <div><p class="eyebrow">${weekdays[weekday - 1] || "今天"}</p><h2>${pageTitle}</h2><p>${displayDate(date)}・雲端即時資料</p></div>
+      <div class="roll-call-title"><p class="eyebrow">${weekdays[weekday - 1] || "今天"}</p><h2>${pageTitle}</h2><p>${displayDate(date)}・雲端即時資料</p></div>
       <button class="button-secondary" data-action="refresh">重新整理</button>
     </div>
     <div class="stat-grid">
@@ -89,7 +89,7 @@ function renderStudent(state, date, slot, id, refresh) {
   const student = getStudent(state, id);
   const record = state.attendance.find((item) => item.studentId === id && item.dateKey === date && item.slot === slot);
   if (!student) return "";
-  return `<article class="student-card roll-call-student-card ${record ? "is-present" : ""}"><div class="student-summary"><div><div class="student-name-row"><div class="student-name${student.paymentPending ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${student.currentLessonCount} 堂</div></div></div><div class="attendance-actions">${record ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}">修改點名</button>` : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}">到班</button>`}</div></article>`;
+  return `<article class="student-card roll-call-student-card ${record ? "is-present" : ""}"><div class="student-summary"><div><div class="student-name-row"><div class="student-name${student.paymentPending ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${student.currentLessonCount} 堂</div><div class="roll-call-mobile-meta">${student.currentLessonCount} / ${record ? escapeHtml(record.arrivalTime) : "未到"}</div></div></div><div class="attendance-actions">${record ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>` : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}">到班</button>`}</div></article>`;
 }
 
 function closeAttendanceModal(backdrop) {

@@ -98,10 +98,19 @@ describe("roll-call view", () => {
         slot: "15:00",
         studentIds: ["student-1"],
       }],
+      attendance: [{
+        id: "2026-07-27__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+        arrivalTime: "15:12",
+      }],
     });
 
     expect(html).toContain('<div class="student-name is-payment-pending">允涵</div><span class="grade-badge">7 年級</span>');
     expect(html).toContain('<div class="student-subtitle">第 16 堂</div>');
+    expect(html).toContain('<div class="roll-call-mobile-meta">16 / 15:12</div>');
+    expect(html).toContain('<span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span>');
     expect(html).not.toContain("/ 24");
     expect(html).not.toContain("第 2 期");
     expect(html).not.toContain("期待付款");

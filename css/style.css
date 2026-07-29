@@ -148,6 +148,7 @@ textarea.input { resize: vertical; }
 .student-name-row { align-items: center; display: flex; gap: 7px; min-width: 0; }
 .student-name-row .student-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .student-name.is-payment-pending { color: var(--danger); }
+.roll-call-mobile-meta, .roll-call-mobile-label { display: none; }
 .student-subtitle { color: var(--muted); font-size: 12px; }
 .student-note-summary { color: var(--muted); font-size: 12px; margin-top: 3px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grade-badge, .status-badge, .pending-badge {
@@ -432,8 +433,47 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .stat-value { font-size: 22px; }
   .student-card { align-items: start; flex-direction: column; }
   .temporary-student-card { align-items: center; flex-direction: row; }
-  .class-students { grid-template-columns: 1fr; }
+  .roll-call-page-head {
+    align-items: end;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .roll-call-page-head .roll-call-title { grid-column: 1; grid-row: 1; min-width: 0; }
+  .roll-call-page-head [data-action="refresh"] { grid-column: 2; grid-row: 1; padding: 7px 9px; }
+  .roll-call-page-head .date-control { grid-column: 1 / -1; grid-row: 2; }
+  .class-list { gap: 12px; }
+  .class-heading { padding: 9px 11px; }
+  .class-students { gap: 6px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 7px; }
+  .roll-call-student-card {
+    align-items: center;
+    display: grid;
+    gap: 5px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 54px;
+    padding: 7px 8px;
+  }
+  .roll-call-student-card .student-summary { min-width: 0; }
+  .roll-call-student-card .student-name-row .grade-badge,
+  .roll-call-student-card .student-subtitle,
+  .roll-call-student-card .attendance-time,
+  .roll-call-desktop-label { display: none; }
+  .roll-call-mobile-meta, .roll-call-mobile-label { display: inline; }
+  .roll-call-mobile-meta { color: var(--muted); font-size: 11px; white-space: nowrap; }
+  .roll-call-student-card .student-name { font-size: 14px; line-height: 1.2; }
+  .roll-call-student-card .attendance-actions { align-self: center; justify-content: flex-end; }
+  .roll-call-student-card .button-edit-attendance,
+  .roll-call-student-card .button-attend {
+    font-size: 11px;
+    min-width: 0;
+    padding: 5px 7px;
+  }
+  .temporary-student-card { gap: 7px; min-height: 54px; padding: 7px 8px; }
+  .temporary-student-card small { display: none; }
+  .temporary-student-icon { font-size: 17px; height: 28px; width: 28px; }
+  .temporary-student-card strong { font-size: 12px; }
   .attendance-actions { align-self: stretch; justify-content: space-between; }
+  .roll-call-student-card .attendance-actions { align-self: center; }
   .form-grid { grid-template-columns: 1fr 1fr; }
   .form-grid .field:first-child { grid-column: span 2; }
   .form-actions { grid-column: span 2; }

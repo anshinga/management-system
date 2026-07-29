@@ -157,6 +157,9 @@ describe("schedule view", () => {
     expect(html).toContain(">19:30<");
     expect(html).not.toContain(">19:00<");
     expect(html).not.toContain(">21:00<");
+    expect(html).toContain('class="schedule-board-layout without-saturday"');
+    expect(html).not.toContain("schedule-saturday-panel");
+    expect(html).not.toContain("8/1 週六");
   });
 
   test("過去已有點名的時段與學生會保持綠色及鎖定", () => {
@@ -250,13 +253,13 @@ describe("schedule view", () => {
     }, vi.fn());
 
     app.previousButton.click();
-    expect(html).toContain("7/20 週一 — 7/25 週六");
+    expect(html).toContain("7/20 週一 — 7/24 週五");
 
     app.nextButton.click();
-    expect(html).toContain("7/27 週一 — 8/1 週六");
+    expect(html).toContain("7/27 週一 — 7/31 週五");
 
     app.nextButton.click();
-    expect(html).toContain("8/3 週一 — 8/8 週六");
+    expect(html).toContain("8/3 週一 — 8/7 週五");
   });
 
   test("切到其他時期會前往第一週並鎖定區間外日期", () => {
@@ -273,5 +276,11 @@ describe("schedule view", () => {
     expect(html).toContain("2026 上學期");
     expect(html).toContain("非此時期");
     expect(html).toContain("schedule-cell is-outside-season");
+    expect(html).toContain("schedule-saturday-panel");
+    expect(html).toContain("週六上午");
+    expect(html).toContain("09:00–10:30");
+    expect(html).toContain("10:30–12:00");
+    expect(html).toContain('data-date="2026-09-05" data-slot="09:00"');
+    expect(html).not.toContain('data-date="2026-09-05" data-slot="15:00"');
   });
 });

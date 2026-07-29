@@ -1,4 +1,4 @@
-import { SCHEDULE_SLOTS } from "../config.js";
+import { ALL_SCHEDULE_SLOTS } from "../config.js";
 import { isDateKey, isTimeValue, normalizeText } from "./models.js";
 
 export const BOOKING_WEEKDAYS = Object.freeze([
@@ -18,7 +18,7 @@ export function makeBookingSlotKey(weekday, slot) {
   if (!BOOKING_WEEKDAYS.some((item) => item.value === normalizedWeekday)) {
     throw new Error("選課星期必須是週一到週六。");
   }
-  if (!SCHEDULE_SLOTS.includes(slot) || !isTimeValue(slot)) {
+  if (!ALL_SCHEDULE_SLOTS.includes(slot) || !isTimeValue(slot)) {
     throw new Error("選課時段不正確。");
   }
   return `${normalizedWeekday}__${slot}`;
@@ -27,7 +27,7 @@ export function makeBookingSlotKey(weekday, slot) {
 export function parseBookingSlotKey(value) {
   const [weekdayValue, slot] = String(value || "").split("__");
   const weekday = Number(weekdayValue);
-  if (!BOOKING_WEEKDAYS.some((item) => item.value === weekday) || !SCHEDULE_SLOTS.includes(slot)) {
+  if (!BOOKING_WEEKDAYS.some((item) => item.value === weekday) || !ALL_SCHEDULE_SLOTS.includes(slot)) {
     throw new Error("選課時段格式不正確。");
   }
   return { weekday, slot };

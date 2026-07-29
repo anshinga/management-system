@@ -1,4 +1,36 @@
 import { isDateKey, isTimeValue } from "./models.js";
+import {
+  SATURDAY_SCHEDULE_SLOTS,
+  WEEKDAY_SCHEDULE_SLOTS,
+} from "../config.js";
+
+export function getSeasonKind(season) {
+  const source = `${season?.id || ""} ${season?.name || ""}`.toLocaleLowerCase();
+  if (source.includes("summer") || source.includes("暑假")) return "summer";
+  if (source.includes("winter") || source.includes("寒假")) return "winter";
+  if (source.includes("fall") || source.includes("上學期")) return "fall";
+  if (source.includes("spring") || source.includes("下學期")) return "spring";
+  return "unknown";
+}
+
+export function isBreakSeason(season) {
+  return ["summer", "winter"].includes(getSeasonKind(season));
+}
+
+export function hasSaturdayMorning(season) {
+  return ["fall", "spring"].includes(getSeasonKind(season));
+}
+
+export function getScheduleSlotsForWeekday(season, weekday) {
+  const normalizedWeekday = Number(weekday);
+  if (normalizedWeekday >= 1 && normalizedWeekday <= 5) {
+    return WEEKDAY_SCHEDULE_SLOTS;
+  }
+  if (normalizedWeekday === 6 && hasSaturdayMorning(season)) {
+    return SATURDAY_SCHEDULE_SLOTS;
+  }
+  return [];
+}
 
 function encodeIdPart(value) {
   return encodeURIComponent(String(value));

@@ -1,14 +1,39 @@
 import { describe, expect, test } from "vitest";
 import {
   buildCarryForwardEntries,
+  getScheduleSlotsForWeekday,
   getSchedulePattern,
+  getSeasonKind,
   groupScheduleEntries,
+  hasSaturdayMorning,
+  isBreakSeason,
   makeScheduleEntryId,
   makeScheduleOverrideId,
   makeSchedulePatternKey,
 } from "../js/domain/schedule.js";
 
 describe("schedule domain", () => {
+  test("寒暑假只開平日下午，上下學期另開週六上午", () => {
+    const summer = { id: "summer-2026", name: "2026 暑假" };
+    const fall = { id: "fall-2026", name: "2026 上學期" };
+
+    expect(getSeasonKind(summer)).toBe("summer");
+    expect(isBreakSeason(summer)).toBe(true);
+    expect(hasSaturdayMorning(summer)).toBe(false);
+    expect(getScheduleSlotsForWeekday(summer, 6)).toEqual([]);
+    expect(getScheduleSlotsForWeekday(summer, 1)).toEqual([
+      "15:00",
+      "16:30",
+      "18:00",
+      "19:30",
+    ]);
+
+    expect(getSeasonKind(fall)).toBe("fall");
+    expect(hasSaturdayMorning(fall)).toBe(true);
+    expect(getScheduleSlotsForWeekday(fall, 6)).toEqual(["09:00", "10:30"]);
+    expect(getScheduleSlotsForWeekday(fall, 7)).toEqual([]);
+  });
+
   test("排課文件 ID 對相同輸入保持穩定", () => {
     expect(makeScheduleEntryId({
       dateKey: "2026-07-27",

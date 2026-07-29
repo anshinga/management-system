@@ -10,6 +10,7 @@ import {
   parseDate,
 } from "../store.js";
 import { SCHEDULE_SLOTS } from "../config.js";
+import { hasSaturdayMorning } from "../domain/schedule.js";
 import {
   ensureScheduleWeek,
   moveScheduleEntry,
@@ -66,6 +67,18 @@ function renderSeasonSwitcher(state, selectedSeason) {
   </div>`;
 }
 
+function renderWeekdayScheduleGrid(state, dates, season) {
+  return `<div class="schedule-wrap"><div class="schedule-grid" style="--schedule-day-count: ${dates.length}"><div class="schedule-label">時間</div>${dates.map((date, index) => `<div class="schedule-day${seasonContainsDate(season, date) ? "" : " is-outside-season"}"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${dates.map((date) => renderCell(state, date, slot, season)).join("")}`).join("")}</div></div>`;
+}
+
+function renderSaturdaySchedule(state, date, season) {
+  const slots = [
+    { start: "09:00", end: "10:30" },
+    { start: "10:30", end: "12:00" },
+  ];
+  return `<aside class="schedule-saturday-panel"><div class="schedule-saturday-head"><span>週六上午</span><strong>${shortDate(date)} ${weekdays[5]}</strong></div><div class="schedule-saturday-slots">${slots.map(({ start, end }) => `<section class="schedule-saturday-slot"><div class="schedule-saturday-time">${start}–${end}</div>${renderCell(state, date, start, season)}</section>`).join("")}</div></aside>`;
+}
+
 export function renderSchedule(state) {
   const attendanceDate = getSelectedAttendanceDate();
   if (observedAttendanceDate !== attendanceDate) {
@@ -78,6 +91,10 @@ export function renderSchedule(state) {
   scheduleWeekStart = getWeekStart(scheduleWeekStart);
   const weekDates = getWeekDates(scheduleWeekStart);
   const season = getSelectedScheduleSeason(state, attendanceDate);
+  const weekdayDates = weekDates.slice(0, 5);
+  const showSaturday = hasSaturdayMorning(season);
+  const displayedWeekEnd = showSaturday ? weekDates[5] : weekDates[4];
+  const displayedWeekEndLabel = showSaturday ? weekdays[5] : weekdays[4];
   selectedScheduleSeasonId = season?.id || "";
   const previousWeekAvailable = seasonContainsDate(season, addDays(scheduleWeekStart, -1));
   const nextWeekAvailable = seasonContainsDate(season, addDays(scheduleWeekStart, 7));
@@ -86,8 +103,8 @@ export function renderSchedule(state) {
   const groupedStudents = [...new Set(activeStudents.map((student) => student.grade))].sort((a, b) => a - b).map((grade) => ({ grade, students: activeStudents.filter((student) => student.grade === grade) }));
 
   return `<div class="page-head schedule-page-head"><div class="schedule-title-row"><h2>排課</h2>${renderSeasonSwitcher(state, season)}</div><button class="button-secondary schedule-edit-button${deletionMode ? " is-active" : ""}" data-action="toggle-delete-mode" type="button" aria-pressed="${deletionMode}"><span aria-hidden="true">${deletionMode ? "✓" : "✎"}</span> ${deletionMode ? "完成" : "修改排課"}</button></div>
-    <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週"${previousWeekAvailable ? "" : " disabled"}>‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(weekDates[5])} ${weekdays[5]}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(weekDates[5])}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週"${nextWeekAvailable ? "" : " disabled"}>›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
-    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span data-palette-count>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day${seasonContainsDate(season, date) ? "" : " is-outside-season"}"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot, season)).join("")}`).join("")}</div></div></section></div>`;
+    <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週"${previousWeekAvailable ? "" : " disabled"}>‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(displayedWeekEnd)} ${displayedWeekEndLabel}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(displayedWeekEnd)}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週"${nextWeekAvailable ? "" : " disabled"}>›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
+    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span data-palette-count>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-board-layout${showSaturday ? "" : " without-saturday"}">${renderWeekdayScheduleGrid(state, weekdayDates, season)}${showSaturday ? renderSaturdaySchedule(state, weekDates[5], season) : ""}</div></section></div>`;
 }
 
 function renderPaletteStudent(student) {

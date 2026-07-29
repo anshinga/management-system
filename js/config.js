@@ -7,9 +7,22 @@ export const APP_CONFIG = Object.freeze({
   ownerEmail: "anshinga79@gmail.com",
 });
 
-export const SCHEDULE_SLOTS = Object.freeze([
+export const WEEKDAY_SCHEDULE_SLOTS = Object.freeze([
   "15:00",
   "16:30",
   "18:00",
   "19:30",
 ]);
+
+export const SATURDAY_SCHEDULE_SLOTS = Object.freeze([
+  "09:00",
+  "10:30",
+]);
+
+export const ALL_SCHEDULE_SLOTS = Object.freeze([
+  ...SATURDAY_SCHEDULE_SLOTS,
+  ...WEEKDAY_SCHEDULE_SLOTS,
+]);
+
+// Keep the existing name as the weekday default for current callers.
+export const SCHEDULE_SLOTS = WEEKDAY_SCHEDULE_SLOTS;

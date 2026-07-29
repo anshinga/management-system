@@ -13,7 +13,7 @@ import {
   resetBookingInvitation,
   saveBookingCampaign,
 } from "../repositories/booking-repository.js";
-import { SCHEDULE_SLOTS } from "../config.js";
+import { getScheduleSlotsForWeekday } from "../domain/schedule.js";
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
 
@@ -51,12 +51,18 @@ function statusClass(status) {
   return status === "open" ? "active" : status === "closed" ? "paused" : "";
 }
 
-function renderSlotOptions(selectedSlots = []) {
+export function renderSlotOptions(selectedSlots = [], season) {
   const selected = new Set(selectedSlots);
-  return `<div class="booking-slot-settings">${BOOKING_WEEKDAYS.map((weekday) => `
+  const availableWeekdays = BOOKING_WEEKDAYS
+    .map((weekday) => ({
+      ...weekday,
+      slots: getScheduleSlotsForWeekday(season, weekday.value),
+    }))
+    .filter((weekday) => weekday.slots.length);
+  return `<div class="booking-slot-settings">${availableWeekdays.map((weekday) => `
     <fieldset class="booking-weekday-group">
       <legend>${weekday.label}</legend>
-      ${SCHEDULE_SLOTS.map((slot) => {
+      ${weekday.slots.map((slot) => {
         const key = makeBookingSlotKey(weekday.value, slot);
         return `<label class="booking-slot-check"><input type="checkbox" name="availableSlots" value="${escapeAttribute(key)}"${selected.has(key) ? " checked" : ""} /><span>${slot}</span></label>`;
       }).join("")}
@@ -98,7 +104,7 @@ function renderCampaignForm(state) {
         <div class="field"><label>每時段上限</label><input class="input" disabled value="${BOOKING_CAPACITY} 位學生" /></div>
         <div class="field field-wide"><label for="booking-excluded-dates">停課日期</label><textarea class="input" id="booking-excluded-dates" name="excludedDates" rows="2" placeholder="例如：2026-08-08, 2026-08-15">${escapeHtml((values.excludedDates || []).join(", "))}</textarea><small>可用逗號或空格分隔，日期必須位於上課區間內。</small></div>
       </div>
-      <div class="booking-slot-section"><div><h4>家長可選的固定週時段</h4><p class="student-subtitle">勾選本次活動開放的星期與時間。</p></div>${renderSlotOptions(values.availableSlots)}</div>
+      <div class="booking-slot-section"><div><h4>家長可選的固定週時段</h4><p class="student-subtitle">勾選本次活動開放的星期與時間。</p></div><div data-booking-slot-options>${renderSlotOptions(values.availableSlots, season)}</div></div>
       <div class="form-actions booking-form-actions"><button class="button-primary" type="submit">${campaign ? "儲存草稿" : "建立草稿"}</button></div>
     </form>
   </section>`;
@@ -195,13 +201,16 @@ export function bindBookingCampaigns(app, state, refresh, showToast) {
     refresh();
   });
   app.querySelector("#booking-season")?.addEventListener("change", (event) => {
-    if (editingCampaignId) return;
     const option = event.target.selectedOptions[0];
     const season = state.seasons.find((item) => item.id === event.target.value);
     const form = event.target.form;
-    form.elements.startDate.value = option?.dataset.start || "";
-    form.elements.endDate.value = option?.dataset.end || "";
-    if (season) form.elements.name.value = `${season.name}時段登記`;
+    const slotOptions = form.querySelector("[data-booking-slot-options]");
+    if (slotOptions) slotOptions.innerHTML = renderSlotOptions([], season);
+    if (!editingCampaignId) {
+      form.elements.startDate.value = option?.dataset.start || "";
+      form.elements.endDate.value = option?.dataset.end || "";
+      if (season) form.elements.name.value = `${season.name}時段登記`;
+    }
   });
   app.querySelector("[data-booking-campaign-form]")?.addEventListener("submit", async (event) => {
     event.preventDefault();

@@ -9,7 +9,10 @@ vi.mock("../js/repositories/booking-repository.js", () => ({
   saveBookingCampaign: vi.fn(),
 }));
 
-const { renderBookingCampaigns } = await import("../js/views/booking-campaigns.js");
+const {
+  renderBookingCampaigns,
+  renderSlotOptions,
+} = await import("../js/views/booking-campaigns.js");
 
 const state = {
   students: [
@@ -60,6 +63,21 @@ const state = {
 };
 
 describe("booking campaigns view", () => {
+  test("活動時段依時期顯示正確營業時間", () => {
+    const summerHtml = renderSlotOptions([], state.seasons[0]);
+    const fallHtml = renderSlotOptions([], {
+      id: "fall-2026",
+      name: "2026 上學期",
+    });
+
+    expect(summerHtml).not.toContain("<legend>週六</legend>");
+    expect(summerHtml).not.toContain("09:00");
+    expect(fallHtml).toContain("<legend>週六</legend>");
+    expect(fallHtml).toContain('value="6__09:00"');
+    expect(fallHtml).toContain('value="6__10:30"');
+    expect(fallHtml).not.toContain('value="6__15:00"');
+  });
+
   test("活動摘要會顯示固定容量、時段與完成進度", () => {
     const html = renderBookingCampaigns(state);
     expect(html).toContain("2026 暑假選課");

@@ -31,6 +31,8 @@ function validCampaign(overrides = {}) {
 describe("booking domain", () => {
   test("固定週時段使用穩定鍵值並顯示中文星期", () => {
     expect(makeBookingSlotKey(1, "15:00")).toBe("1__15:00");
+    expect(makeBookingSlotKey(6, "09:00")).toBe("6__09:00");
+    expect(formatBookingSlot("6__09:00")).toBe("週六 09:00");
     expect(formatBookingSlot("6__19:30")).toBe("週六 19:30");
     expect(makeCounterId("campaign-1", "3__16:30"))
       .toBe("campaign-1__3__16%3A30");
@@ -65,6 +67,20 @@ describe("booking domain", () => {
       "2026-07-20",
       "2026-07-27",
     ]);
+  });
+
+  test("週六上午選擇會展開成上午排課文件", () => {
+    const result = expandSelectedSlots(
+      validCampaign({
+        seasonId: "fall-2026",
+        availableSlots: ["6__09:00"],
+        maxChoices: 1,
+      }),
+      "student-1",
+      ["6__09:00"],
+    );
+    expect(result.entries[0].slot).toBe("09:00");
+    expect(result.entries[0].id).toContain("__09%3A00__");
   });
 
   test("一次選擇會展開成確定且不重複的排課文件", () => {

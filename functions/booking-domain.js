@@ -1,4 +1,4 @@
-const SCHEDULE_SLOTS = Object.freeze(["15:00", "16:30", "18:00", "19:30"]);
+const SCHEDULE_SLOTS = Object.freeze(["09:00", "10:30", "15:00", "16:30", "18:00", "19:30"]);
 const WEEKDAYS = Object.freeze([1, 2, 3, 4, 5, 6]);
 
 function pad(value) {
@@ -118,4 +118,3 @@ export function expandSelectedSlots(campaign, studentId, selectedSlots) {
   if (entries.length > 420) throw new Error("這次選擇產生的排課筆數過多，請縮短日期區間或降低最多選擇數量。");
   return { selectedSlots: uniqueSlots, entries };
 }
-

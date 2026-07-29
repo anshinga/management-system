@@ -10,7 +10,7 @@ import {
   parseDate,
   setSelectedAttendanceDate,
 } from "../store.js";
-import { SCHEDULE_SLOTS } from "../config.js";
+import { getScheduleSlotsForWeekday } from "../domain/schedule.js";
 import {
   markAttendance,
   removeLatestAttendance,
@@ -37,10 +37,11 @@ export function renderRollCall(state, refresh) {
   const weekday = getWeekday(dateObject);
   const pageTitle = date === getTodayDate() ? "今日點名" : "歷史點名";
   const season = getSeasonForDate(state, date);
+  const scheduleSlots = getScheduleSlotsForWeekday(season, weekday);
   const activeStudentIds = new Set(
     state.students.filter((student) => student.status === "active").map((student) => student.id),
   );
-  const todaySchedules = SCHEDULE_SLOTS.map((slot) => {
+  const todaySchedules = scheduleSlots.map((slot) => {
     const schedule = getSchedule(state, date, slot, season?.id) || { studentIds: [] };
     return {
       slot,
@@ -70,7 +71,9 @@ export function renderRollCall(state, refresh) {
       <div class="stat"><div class="stat-label">待繳費</div><div class="stat-value">${pending}</div><div class="stat-note">仍可正常點名</div></div>
     </div>
     <div class="class-list">
-      ${todaySchedules.map(({ slot, schedule }) => renderClass(state, date, slot, schedule, refresh)).join("")}
+      ${todaySchedules.length
+        ? todaySchedules.map(({ slot, schedule }) => renderClass(state, date, slot, schedule, refresh)).join("")
+        : '<div class="panel empty"><strong>今日未營業</strong><p>這個日期沒有開放上課時段。</p></div>'}
     </div>`;
 }
 

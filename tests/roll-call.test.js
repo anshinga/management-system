@@ -78,6 +78,36 @@ describe("roll-call view", () => {
     expect(html).toContain('<div class="stat-label">當日已到班</div><div class="stat-value">0</div>');
   });
 
+  test("學生卡片顯示精簡堂數，年級在姓名右側，欠費只標紅姓名", () => {
+    const html = renderRollCall({
+      ...state,
+      students: [{
+        id: "student-1",
+        name: "允涵",
+        grade: 7,
+        status: "active",
+        currentLessonCount: 16,
+        currentTerm: 2,
+        paymentPending: true,
+        pendingPaymentCount: 1,
+      }],
+      schedules: [{
+        id: "summer-2026-2026-07-27-15:00",
+        season: "summer-2026",
+        date: "2026-07-27",
+        slot: "15:00",
+        studentIds: ["student-1"],
+      }],
+    });
+
+    expect(html).toContain('<div class="student-name is-payment-pending">允涵</div><span class="grade-badge">7 年級</span>');
+    expect(html).toContain('<div class="student-subtitle">第 16 堂</div>');
+    expect(html).not.toContain("/ 24");
+    expect(html).not.toContain("第 2 期");
+    expect(html).not.toContain("期待付款");
+    expect(html).not.toContain("pending-badge");
+  });
+
   test("上學期週六只顯示兩個上午時段", () => {
     selectAttendanceDate("2026-01-10");
     const html = renderRollCall({

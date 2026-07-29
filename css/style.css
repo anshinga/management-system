@@ -133,8 +133,11 @@ textarea.input { resize: vertical; }
 .class-heading { align-items: center; background: var(--surface-alt); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; padding: 13px 17px; }
 .class-heading h3 { margin: 0; }
 .class-heading span { color: var(--muted); font-size: 13px; }
-.class-students { display: grid; gap: 10px; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; }
+.class-students { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 10px; }
 .student-card { align-items: center; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 12px 14px; }
+.roll-call-student-card { gap: 8px; padding: 10px 12px; }
+.roll-call-student-card .student-summary { flex: 1 1 auto; }
+.roll-call-student-card .attendance-actions { flex: 0 0 auto; gap: 6px; }
 .student-card.is-present { background: #f2f8f2; border-color: #b8d4be; }
 .temporary-student-card { background: transparent; border-style: dashed; color: var(--muted); cursor: pointer; justify-content: flex-start; text-align: left; }
 .temporary-student-card:hover { background: var(--surface-alt); border-color: var(--gold); color: var(--gold-dark); }
@@ -142,6 +145,9 @@ textarea.input { resize: vertical; }
 .temporary-student-icon { align-items: center; background: var(--gold-soft); border-radius: 50%; color: var(--gold-dark); display: inline-flex; flex: 0 0 auto; font-size: 20px; height: 34px; justify-content: center; width: 34px; }
 .student-summary { gap: 10px; min-width: 0; }
 .student-name { font-weight: 600; }
+.student-name-row { align-items: center; display: flex; gap: 7px; min-width: 0; }
+.student-name-row .student-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.student-name.is-payment-pending { color: var(--danger); }
 .student-subtitle { color: var(--muted); font-size: 12px; }
 .student-note-summary { color: var(--muted); font-size: 12px; margin-top: 3px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .grade-badge, .status-badge, .pending-badge {
@@ -410,6 +416,9 @@ body.dark .student-card.is-present { background: #283b2d; border-color: #53755b;
 body.dark .schedule-student.is-present { background: #283b2d; border-color: #53755b; color: var(--success); }
 body.dark .student-status-select.active { background-color: #283b2d; border-color: #53755b; }
 body.dark .student-status-select.paused { background-color: #3a3b36; border-color: #55564f; }
+@media (max-width: 1050px) {
+  .class-students { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 @media (max-width: 720px) {
   .auth-gate { padding: 16px; }
   .auth-card { padding: 24px 18px; }

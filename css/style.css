@@ -233,7 +233,7 @@ textarea.input { resize: vertical; }
 .palette-student { background: var(--surface-alt); min-height: 38px; padding: 7px 8px; touch-action: none; }
 .palette-student:hover { border-color: var(--gold); }
 .schedule-board { min-width: 0; padding: 14px; }
-.schedule-board-layout { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 180px; min-width: 0; }
+.schedule-board-layout { display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) 150px; min-width: 0; }
 .schedule-board-layout.without-saturday { grid-template-columns: minmax(0, 1fr); }
 .schedule-board .schedule-wrap { overflow: hidden; }
 .schedule-board .schedule-grid { grid-template-columns: 50px repeat(var(--schedule-day-count, 6), minmax(0, 1fr)); min-width: 0; width: 100%; }
@@ -247,6 +247,11 @@ textarea.input { resize: vertical; }
 .schedule-saturday-slot { min-width: 0; }
 .schedule-saturday-time { color: var(--muted); font-size: 11px; padding: 0 2px 5px; }
 .schedule-saturday-slot .schedule-cell { min-height: 247px; }
+.schedule-board-layout:not(.without-saturday) .schedule-student span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .cell-count { align-items: center; color: var(--muted); display: flex; font-size: 12px; gap: 6px; justify-content: space-between; margin-bottom: 8px; }
 .cell-attendance-count { color: var(--success); font-weight: 600; white-space: nowrap; }
 .schedule-board .schedule-cell.is-attendance-date { background: var(--surface-alt); }

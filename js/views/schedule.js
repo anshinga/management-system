@@ -20,6 +20,7 @@ import { getUserErrorMessage } from "../ui/errors.js";
 
 const weekdays = ["週一", "週二", "週三", "週四", "週五", "週六"];
 let scheduleWeekStart = getWeekStart(new Date());
+let selectedScheduleSeasonId = "";
 let scheduleSearch = "";
 let paletteCollapsed = false;
 let deletionMode = false;
@@ -33,22 +34,60 @@ function fullDate(date) {
   return `${date.getFullYear()} 年 ${date.getMonth() + 1} 月 ${date.getDate()} 日`;
 }
 
+function sortedSeasons(state) {
+  return [...state.seasons].sort((a, b) => (
+    String(a.startDate).localeCompare(String(b.startDate))
+  ));
+}
+
+function seasonContainsDate(season, date) {
+  const dateKey = typeof date === "string" ? date : formatDate(date);
+  return Boolean(season && dateKey >= season.startDate && dateKey <= season.endDate);
+}
+
+function getSelectedScheduleSeason(state, preferredDate = scheduleWeekStart) {
+  const seasons = sortedSeasons(state);
+  return seasons.find((season) => season.id === selectedScheduleSeasonId)
+    || seasons.find((season) => seasonContainsDate(season, preferredDate))
+    || seasons.find((season) => season.active)
+    || seasons[0];
+}
+
+export function getSeasonNavigationDate(season, today = new Date()) {
+  return seasonContainsDate(season, today) ? today : parseDate(season.startDate);
+}
+
+function renderSeasonSwitcher(state, selectedSeason) {
+  const seasons = sortedSeasons(state);
+  if (!seasons.length) return "";
+  return `<div class="schedule-season-switcher" aria-label="切換排課時期">
+    <div class="schedule-season-buttons">${seasons.map((season) => `<button class="schedule-season-button${season.id === selectedSeason?.id ? " is-active" : ""}" data-action="switch-schedule-season" data-season-id="${escapeAttribute(season.id)}" type="button" aria-pressed="${season.id === selectedSeason?.id}">${escapeHtml(season.name)}</button>`).join("")}</div>
+    <label class="schedule-season-select-label" for="schedule-season-select"><span>切換時期</span><select class="select" id="schedule-season-select">${seasons.map((season) => `<option value="${escapeAttribute(season.id)}"${season.id === selectedSeason?.id ? " selected" : ""}>${escapeHtml(season.name)}</option>`).join("")}</select></label>
+  </div>`;
+}
+
 export function renderSchedule(state) {
   const attendanceDate = getSelectedAttendanceDate();
   if (observedAttendanceDate !== attendanceDate) {
     scheduleWeekStart = getWeekStart(parseDate(attendanceDate));
+    selectedScheduleSeasonId = state.seasons.find((season) => (
+      seasonContainsDate(season, attendanceDate)
+    ))?.id || "";
     observedAttendanceDate = attendanceDate;
   }
   scheduleWeekStart = getWeekStart(scheduleWeekStart);
   const weekDates = getWeekDates(scheduleWeekStart);
-  const season = getSeasonForDate(state, weekDates[0]);
+  const season = getSelectedScheduleSeason(state, attendanceDate);
+  selectedScheduleSeasonId = season?.id || "";
+  const previousWeekAvailable = seasonContainsDate(season, addDays(scheduleWeekStart, -1));
+  const nextWeekAvailable = seasonContainsDate(season, addDays(scheduleWeekStart, 7));
   const activeStudents = [...state.students].filter((student) => student.status === "active").sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name, "zh-Hant"));
   const filteredStudents = activeStudents.filter((student) => !scheduleSearch || `${student.name}${student.grade}`.includes(scheduleSearch));
   const groupedStudents = [...new Set(activeStudents.map((student) => student.grade))].sort((a, b) => a - b).map((grade) => ({ grade, students: activeStudents.filter((student) => student.grade === grade) }));
 
-  return `<div class="page-head"><div><p class="eyebrow">${escapeHtml(season?.name || "目前時段")}</p><h2>排課</h2><p>每週獨立保存日期，下一週首次開啟時會沿用前一週排課。<br>綠色標示為已有點名紀錄，無法調整。${deletionMode ? '<br><span class="delete-mode-hint">刪除模式：點選學生卡片上的 ×，將從本週起移除。</span>' : ""}</p></div><button class="button-secondary schedule-edit-button${deletionMode ? " is-active" : ""}" data-action="toggle-delete-mode" type="button" aria-pressed="${deletionMode}"><span aria-hidden="true">${deletionMode ? "✓" : "✎"}</span> ${deletionMode ? "完成" : "修改排課"}</button></div>
-    <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週">‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(weekDates[5])} ${weekdays[5]}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(weekDates[5])}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週">›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
-    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span data-palette-count>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot)).join("")}`).join("")}</div></div></section></div>`;
+  return `${renderSeasonSwitcher(state, season)}<div class="page-head schedule-page-head"><div><p class="eyebrow">${escapeHtml(season?.name || "目前時段")}</p><h2>排課</h2><p>每週獨立保存日期，下一週首次開啟時會沿用前一週排課。<br>綠色標示為已有點名紀錄，無法調整。${deletionMode ? '<br><span class="delete-mode-hint">刪除模式：點選學生卡片上的 ×，將從本週起移除。</span>' : ""}</p></div><button class="button-secondary schedule-edit-button${deletionMode ? " is-active" : ""}" data-action="toggle-delete-mode" type="button" aria-pressed="${deletionMode}"><span aria-hidden="true">${deletionMode ? "✓" : "✎"}</span> ${deletionMode ? "完成" : "修改排課"}</button></div>
+    <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週"${previousWeekAvailable ? "" : " disabled"}>‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(weekDates[5])} ${weekdays[5]}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(weekDates[5])}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週"${nextWeekAvailable ? "" : " disabled"}>›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
+    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span data-palette-count>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-wrap"><div class="schedule-grid"><div class="schedule-label">時間</div>${weekDates.map((date, index) => `<div class="schedule-day${seasonContainsDate(season, date) ? "" : " is-outside-season"}"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${weekDates.map((date) => renderCell(state, date, slot, season)).join("")}`).join("")}</div></div></section></div>`;
 }
 
 function renderPaletteStudent(student) {
@@ -104,10 +143,13 @@ function renderScheduledStudent(student, {
   return `<div class="${studentClass}" ${dragAttributes} ${sourceAttributes}><span>${escapeHtml(student.name)}</span>${temporaryLabel}</div>`;
 }
 
-function renderCell(state, date, slot) {
+function renderCell(state, date, slot, season) {
   const dateKey = formatDate(date);
+  if (!seasonContainsDate(season, dateKey)) {
+    return `<div class="schedule-cell is-outside-season" aria-disabled="true"><div class="cell-count"><span>—</span></div><div class="cell-students"><span class="student-subtitle">非此時期</span></div></div>`;
+  }
   const attendanceDate = getSelectedAttendanceDate();
-  const seasonId = getSeasonForDate(state, date)?.id || "summer-2026";
+  const seasonId = season?.id || getSeasonForDate(state, date)?.id || "summer-2026";
   const schedule = getSchedule(state, dateKey, slot, seasonId);
   const students = schedule?.studentIds.map((id) => getStudent(state, id)).filter(Boolean) || [];
   const temporaryStudentIds = new Set(schedule?.temporaryStudentIds || []);
@@ -120,26 +162,58 @@ function renderCell(state, date, slot) {
 }
 
 export function bindSchedule(app, state, refresh, showToast) {
-  const visibleSeason = getSeasonForDate(state, scheduleWeekStart);
+  const visibleSeason = getSelectedScheduleSeason(state);
   const ensureKey = `${visibleSeason?.id || ""}:${formatDate(scheduleWeekStart)}`;
   if (visibleSeason && ensureKey !== lastEnsuredWeekKey) {
     lastEnsuredWeekKey = ensureKey;
     const queuedWeekStart = getWeekStart(scheduleWeekStart);
     scheduleEnsureQueue = scheduleEnsureQueue
       .catch(() => undefined)
-      .then(() => ensureScheduleWeek(queuedWeekStart, visibleSeason.id))
+      .then(() => ensureScheduleWeek(queuedWeekStart, visibleSeason.id, {
+        startDate: visibleSeason.startDate,
+        endDate: visibleSeason.endDate,
+      }))
       .catch((error) => {
         if (lastEnsuredWeekKey === ensureKey) lastEnsuredWeekKey = "";
         showToast(getUserErrorMessage(error, "無法沿用前一週排課"));
       });
   }
   const navigateToWeek = (targetWeekStart) => {
-    scheduleWeekStart = getWeekStart(targetWeekStart);
+    const normalizedWeekStart = getWeekStart(targetWeekStart);
+    const weekEnd = addDays(normalizedWeekStart, 5);
+    if (visibleSeason
+      && (formatDate(weekEnd) < visibleSeason.startDate
+        || formatDate(normalizedWeekStart) > visibleSeason.endDate)) return;
+    scheduleWeekStart = normalizedWeekStart;
     refresh();
   };
+  const switchSeason = (seasonId) => {
+    const season = state.seasons.find((item) => item.id === seasonId);
+    if (!season) return;
+    selectedScheduleSeasonId = season.id;
+    scheduleWeekStart = getWeekStart(getSeasonNavigationDate(season));
+    lastEnsuredWeekKey = "";
+    refresh();
+  };
+  app.querySelectorAll('[data-action="switch-schedule-season"]').forEach((button) => {
+    button.addEventListener("click", () => switchSeason(button.dataset.seasonId));
+  });
+  app.querySelector("#schedule-season-select")?.addEventListener("change", (event) => {
+    switchSeason(event.target.value);
+  });
   app.querySelector('[data-action="prev-week"]')?.addEventListener("click", () => navigateToWeek(addDays(scheduleWeekStart, -7)));
   app.querySelector('[data-action="next-week"]')?.addEventListener("click", () => navigateToWeek(addDays(scheduleWeekStart, 7)));
-  app.querySelector('[data-action="current-week"]')?.addEventListener("click", () => navigateToWeek(getWeekStart(new Date())));
+  app.querySelector('[data-action="current-week"]')?.addEventListener("click", () => {
+    const today = new Date();
+    const currentSeason = sortedSeasons(state).find((season) => seasonContainsDate(season, today))
+      || sortedSeasons(state).find((season) => season.active)
+      || visibleSeason;
+    if (!currentSeason) return;
+    selectedScheduleSeasonId = currentSeason.id;
+    scheduleWeekStart = getWeekStart(getSeasonNavigationDate(currentSeason, today));
+    lastEnsuredWeekKey = "";
+    refresh();
+  });
   app.querySelector('[data-action="toggle-delete-mode"]')?.addEventListener("click", () => {
     deletionMode = !deletionMode;
     refresh();
@@ -176,7 +250,7 @@ export function bindSchedule(app, state, refresh, showToast) {
   let touchDrag = null;
   let keyboardDrag = null;
   const dragItems = [...app.querySelectorAll("[data-drag-student]:not(.is-locked)")];
-  const cells = [...app.querySelectorAll(".schedule-cell")];
+  const cells = [...app.querySelectorAll(".schedule-cell:not(.is-outside-season)")];
   const getDragData = (item) => ({
     studentId: item.dataset.dragStudent,
     source: item.dataset.dragSource === "schedule"

@@ -248,7 +248,7 @@ export async function addTemporaryScheduleEntries(studentIds, target) {
   });
 }
 
-export async function ensureScheduleWeek(date, seasonId) {
+export async function ensureScheduleWeek(date, seasonId, seasonRange = null) {
   const weekStartDate = getWeekStart(typeof date === "string" ? parseDate(date) : date);
   const weekStart = formatDate(weekStartDate);
   const weekEnd = formatDate(addDays(weekStartDate, 6));
@@ -276,7 +276,8 @@ export async function ensureScheduleWeek(date, seasonId) {
     currentEntries: currentSnapshot.docs.map((snapshot) => snapshot.data()),
     overrides: overrideSnapshot.docs.map((snapshot) => snapshot.data()),
     seasonId,
-  });
+  }).filter((entry) => !seasonRange
+    || (entry.dateKey >= seasonRange.startDate && entry.dateKey <= seasonRange.endDate));
 
   if (!missingEntries.length) return false;
 

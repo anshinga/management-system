@@ -185,6 +185,29 @@ textarea.input { resize: vertical; }
 .cell-edit { background: transparent; border: 0; color: var(--muted); font-size: 12px; margin-top: 10px; padding: 0; }
 .cell-edit:hover { color: var(--gold-dark); }
 .week-toolbar { align-items: center; display: flex; gap: 10px; margin-bottom: 18px; }
+.schedule-season-switcher { margin-bottom: 18px; max-width: 100%; }
+.schedule-season-buttons {
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 6px;
+  max-width: 100%;
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.schedule-season-button {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+  flex: 0 0 auto;
+  font-weight: 600;
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+.schedule-season-button:hover { background: var(--surface); border-color: var(--line); color: var(--text); }
+.schedule-season-button.is-active { background: var(--gold-soft); border-color: var(--gold); color: var(--gold-dark); }
+.schedule-season-select-label { display: none; }
+.schedule-season-select-label span { color: var(--muted); display: block; font-size: 12px; margin-bottom: 5px; }
 .week-title { display: flex; flex: 1; flex-direction: column; min-width: 0; text-align: center; }
 .week-title span { color: var(--muted); font-size: 12px; }
 .schedule-edit-button { align-items: center; display: inline-flex; gap: 5px; white-space: nowrap; }
@@ -217,6 +240,21 @@ textarea.input { resize: vertical; }
 .cell-attendance-count { color: var(--success); font-weight: 600; white-space: nowrap; }
 .schedule-board .schedule-cell.is-attendance-date { background: var(--surface-alt); }
 .schedule-board .schedule-cell.has-attendance { border-color: var(--success); }
+.schedule-board .schedule-day.is-outside-season { opacity: .4; }
+.schedule-board .schedule-cell.is-outside-season {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--surface-alt),
+    var(--surface-alt) 8px,
+    var(--surface) 8px,
+    var(--surface) 16px
+  );
+  border-style: dashed;
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: .62;
+}
+.round-button:disabled { cursor: not-allowed; opacity: .35; }
 .schedule-student { background: var(--gold-soft); border-color: transparent; color: var(--gold-dark); min-width: 0; overflow-wrap: anywhere; padding: 6px 7px; touch-action: none; }
 .schedule-student.is-present { background: #e5f2e8; border-color: #b8d4be; color: var(--success); }
 .schedule-student.is-locked { cursor: not-allowed; opacity: .82; }
@@ -364,6 +402,9 @@ body.dark .schedule-student.is-present { background: #283b2d; border-color: #537
   .modal-form-grid .field-wide { grid-column: auto; }
   .checkbox-list { grid-template-columns: 1fr; }
   .week-toolbar { flex-wrap: wrap; }
+  .schedule-season-buttons { display: none; }
+  .schedule-season-select-label { display: block; }
+  .schedule-season-select-label .select { width: 100%; }
   .week-title { order: 1; width: calc(100% - 100px); }
   .week-toolbar [data-action="current-week"] { margin-left: auto; order: 2; }
   .schedule-editor { display: flex; flex-direction: column; }

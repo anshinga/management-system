@@ -241,7 +241,10 @@ export function bindRollCall(app, state, refresh, showToast) {
   const ensureKey = `${selectedSeason?.id || ""}:${getWeekStart(parseDate(selectedDate)).toISOString()}`;
   if (selectedSeason && ensureKey !== lastEnsuredAttendanceWeekKey) {
     lastEnsuredAttendanceWeekKey = ensureKey;
-    ensureScheduleWeek(selectedDate, selectedSeason.id).catch((error) => {
+    ensureScheduleWeek(selectedDate, selectedSeason.id, {
+      startDate: selectedSeason.startDate,
+      endDate: selectedSeason.endDate,
+    }).catch((error) => {
       lastEnsuredAttendanceWeekKey = "";
       showToast(getUserErrorMessage(error, "無法沿用前一週排課"));
     });

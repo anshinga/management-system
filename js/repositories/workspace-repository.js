@@ -13,22 +13,46 @@ import {
   workspaceRef,
 } from "./firestore-paths.js";
 
-const DEFAULT_SEASONS = Object.freeze([
-  {
-    id: "summer-2026",
-    name: "2026 暑假",
-    startDate: "2026-07-01",
-    endDate: "2026-08-31",
-    active: true,
-  },
-  {
-    id: "fall-2026",
-    name: "2026 上學期",
-    startDate: "2026-09-01",
-    endDate: "2027-01-31",
-    active: false,
-  },
-]);
+function dateKey(year, month, day) {
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export function buildAcademicSeasons(date = new Date()) {
+  const currentYear = date.getFullYear();
+  const cycleYear = date.getMonth() >= 6 ? currentYear : currentYear - 1;
+  const nextYear = cycleYear + 1;
+  const today = dateKey(currentYear, date.getMonth() + 1, date.getDate());
+  const lastFebruaryDay = new Date(nextYear, 2, 0).getDate();
+  return [
+    {
+      id: `summer-${cycleYear}`,
+      name: `${cycleYear} 暑假`,
+      startDate: dateKey(cycleYear, 7, 1),
+      endDate: dateKey(cycleYear, 8, 31),
+    },
+    {
+      id: `fall-${cycleYear}`,
+      name: `${cycleYear} 上學期`,
+      startDate: dateKey(cycleYear, 9, 1),
+      endDate: dateKey(nextYear, 1, 31),
+    },
+    {
+      id: `winter-${nextYear}`,
+      name: `${nextYear} 寒假`,
+      startDate: dateKey(nextYear, 2, 1),
+      endDate: dateKey(nextYear, 2, lastFebruaryDay),
+    },
+    {
+      id: `spring-${nextYear}`,
+      name: `${nextYear} 下學期`,
+      startDate: dateKey(nextYear, 3, 1),
+      endDate: dateKey(nextYear, 6, 30),
+    },
+  ].map((season) => ({
+    ...season,
+    active: today >= season.startDate && today <= season.endDate,
+  }));
+}
 
 function normalizeEmail(email) {
   return typeof email === "string" ? email.trim().toLowerCase() : "";
@@ -52,7 +76,10 @@ export async function bootstrapWorkspace(user) {
 
   const workspace = workspaceRef();
   const member = workspaceDocumentRef(COLLECTIONS.members, user.uid);
-  const seasonRefs = DEFAULT_SEASONS.map((season) => workspaceDocumentRef(COLLECTIONS.seasons, season.id));
+  const defaultSeasons = buildAcademicSeasons();
+  const seasonRefs = defaultSeasons.map((season) => (
+    workspaceDocumentRef(COLLECTIONS.seasons, season.id)
+  ));
 
   await runTransaction(db, async (transaction) => {
     const [workspaceSnapshot, memberSnapshot, ...seasonSnapshots] = await Promise.all([
@@ -88,7 +115,7 @@ export async function bootstrapWorkspace(user) {
       });
     }
 
-    DEFAULT_SEASONS.forEach((season, index) => {
+    defaultSeasons.forEach((season, index) => {
       if (seasonSnapshots[index].exists()) return;
       const { id, ...data } = season;
       transaction.set(seasonRefs[index], {

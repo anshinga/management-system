@@ -11,7 +11,11 @@ vi.mock("../js/repositories/schedule-repository.js", () => ({
   removeScheduleEntry,
 }));
 
-const { bindSchedule, renderSchedule } = await import("../js/views/schedule.js");
+const {
+  bindSchedule,
+  getSeasonNavigationDate,
+  renderSchedule,
+} = await import("../js/views/schedule.js");
 
 class FakeButton {
   constructor(dataset = {}) {
@@ -29,7 +33,7 @@ class FakeButton {
   }
 }
 
-function makeApp({ removeButton } = {}) {
+function makeApp({ removeButton, seasonButtons = [] } = {}) {
   const toggleButton = new FakeButton();
   const previousButton = new FakeButton();
   const nextButton = new FakeButton();
@@ -47,6 +51,7 @@ function makeApp({ removeButton } = {}) {
       return null;
     },
     querySelectorAll(selector) {
+      if (selector === '[data-action="switch-schedule-season"]') return seasonButtons;
       if (selector === '[data-action="remove-schedule-student"]' && removeButton) {
         return [removeButton];
       }
@@ -80,6 +85,34 @@ const state = {
   attendance: [],
 };
 
+const allSeasonState = {
+  ...state,
+  seasons: [
+    state.seasons[0],
+    {
+      id: "fall-2026",
+      name: "2026 上學期",
+      startDate: "2026-09-01",
+      endDate: "2027-01-31",
+      active: false,
+    },
+    {
+      id: "winter-2027",
+      name: "2027 寒假",
+      startDate: "2027-02-01",
+      endDate: "2027-02-28",
+      active: false,
+    },
+    {
+      id: "spring-2027",
+      name: "2027 下學期",
+      startDate: "2027-03-01",
+      endDate: "2027-06-30",
+      active: false,
+    },
+  ],
+};
+
 beforeEach(() => {
   const values = new Map([["mpm-selected-attendance-date", "2026-07-27"]]);
   vi.stubGlobal("localStorage", {
@@ -92,6 +125,24 @@ beforeEach(() => {
 });
 
 describe("schedule view", () => {
+  test("左上角會顯示可切換的四個時期", () => {
+    const html = renderSchedule(allSeasonState);
+    expect(html).toContain("2026 暑假");
+    expect(html).toContain("2026 上學期");
+    expect(html).toContain("2027 寒假");
+    expect(html).toContain("2027 下學期");
+    expect(html.match(/data-action="switch-schedule-season"/g)).toHaveLength(4);
+    expect(html).toContain('id="schedule-season-select"');
+  });
+
+  test("目前時期跳到今天，其他時期跳到開始日期", () => {
+    const summer = allSeasonState.seasons[0];
+    const fall = allSeasonState.seasons[1];
+    const today = new Date(2026, 6, 29);
+    expect(getSeasonNavigationDate(summer, today)).toBe(today);
+    expect(getSeasonNavigationDate(fall, today)).toEqual(new Date(2026, 8, 1));
+  });
+
   test("排課與點名共用四個 90 分鐘時段，最後一堂於 21:00 結束", () => {
     expect(SCHEDULE_SLOTS).toEqual([
       "15:00",
@@ -187,5 +238,21 @@ describe("schedule view", () => {
 
     app.nextButton.click();
     expect(html).toContain("8/3 週一 — 8/8 週六");
+  });
+
+  test("切到其他時期會前往第一週並鎖定區間外日期", () => {
+    let html = renderSchedule(allSeasonState);
+    const fallButton = new FakeButton({ seasonId: "fall-2026" });
+    const app = makeApp({ seasonButtons: [fallButton] });
+    bindSchedule(app, allSeasonState, () => {
+      html = renderSchedule(allSeasonState);
+    }, vi.fn());
+
+    fallButton.click();
+
+    expect(html).toContain("8/31 週一 — 9/5 週六");
+    expect(html).toContain("2026 上學期");
+    expect(html).toContain("非此時期");
+    expect(html).toContain("schedule-cell is-outside-season");
   });
 });

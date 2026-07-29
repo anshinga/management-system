@@ -151,7 +151,9 @@ function renderCell(state, date, slot, season) {
   const attendanceDate = getSelectedAttendanceDate();
   const seasonId = season?.id || getSeasonForDate(state, date)?.id || "summer-2026";
   const schedule = getSchedule(state, dateKey, slot, seasonId);
-  const students = schedule?.studentIds.map((id) => getStudent(state, id)).filter(Boolean) || [];
+  const students = schedule?.studentIds
+    .map((id) => getStudent(state, id))
+    .filter((student) => student?.status === "active") || [];
   const temporaryStudentIds = new Set(schedule?.temporaryStudentIds || []);
   const attendanceRecords = state.attendance.filter((item) => item.dateKey === dateKey && item.slot === slot);
   const presentStudentIds = new Set(attendanceRecords.map((item) => item.studentId));

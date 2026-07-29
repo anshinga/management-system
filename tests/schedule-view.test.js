@@ -180,6 +180,23 @@ describe("schedule view", () => {
     expect(html).toContain('aria-disabled="true" title="已簽到，無法調整排課"');
   });
 
+  test("停課學生不會出現在排課名單或排課格", () => {
+    const pausedState = {
+      ...state,
+      students: [
+        ...state.students,
+        { id: "student-paused", name: "停課生", grade: 1, status: "paused" },
+      ],
+      schedules: [{
+        ...state.schedules[0],
+        studentIds: ["student-1", "student-paused"],
+      }],
+    };
+    const html = renderSchedule(pausedState);
+    expect(html).toContain("敬澄");
+    expect(html).not.toContain("停課生");
+  });
+
   test("鉛筆按鈕會切換刪除模式並顯示移除操作", () => {
     let html = renderSchedule(state);
     expect(html).toContain("✎");

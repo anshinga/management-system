@@ -361,6 +361,19 @@ textarea.input { resize: vertical; }
 .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 90vh; max-width: 520px; overflow: auto; padding: 20px; width: 100%; }
 .modal-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 15px; }
 .modal-head h3 { margin: 0; }
+.student-modal-title-row { align-items: center; display: flex; gap: 10px; }
+.student-status-select {
+  border: 1px solid transparent;
+  border-radius: 99px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 25px 4px 10px;
+}
+.student-status-select.active { background-color: #e5f2e8; border-color: #b8d4be; color: var(--success); }
+.student-status-select.paused { background-color: #eee; border-color: #d6d6d2; color: var(--muted); }
+.student-status-select:focus { outline: 2px solid var(--gold); outline-offset: 2px; }
 .modal-close { background: transparent; border: 1px solid var(--line); border-radius: 7px; color: var(--muted); padding: 6px 10px; }
 .modal-close:hover { border-color: var(--gold); color: var(--gold-dark); }
 .modal-form { display: grid; gap: 18px; }
@@ -380,6 +393,8 @@ textarea.input { resize: vertical; }
 body.dark { --bg: #1d1e1b; --surface: #282925; --surface-alt: #22231f; --text: #f2f1e9; --muted: #a8a99e; --line: #464740; --gold-soft: #4c401d; --success: #8fc29a; --warning: #e1a56f; }
 body.dark .student-card.is-present { background: #283b2d; border-color: #53755b; }
 body.dark .schedule-student.is-present { background: #283b2d; border-color: #53755b; color: var(--success); }
+body.dark .student-status-select.active { background-color: #283b2d; border-color: #53755b; }
+body.dark .student-status-select.paused { background-color: #3a3b36; border-color: #55564f; }
 @media (max-width: 720px) {
   .auth-gate { padding: 16px; }
   .auth-card { padding: 24px 18px; }

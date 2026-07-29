@@ -45,4 +45,32 @@ describe("roll-call view", () => {
     expect(html).toContain(">19:30<");
     expect(html).toContain("只加入本日，不會立即點名");
   });
+
+  test("停課學生即使保留排課也不會出現在點名畫面", () => {
+    const html = renderRollCall({
+      ...state,
+      students: [
+        { id: "active", name: "在讀生", grade: 1, status: "active" },
+        { id: "paused", name: "停課生", grade: 1, status: "paused" },
+      ],
+      schedules: [{
+        id: "summer-2026-2026-07-27-15:00",
+        season: "summer-2026",
+        date: "2026-07-27",
+        slot: "15:00",
+        studentIds: ["active", "paused"],
+      }],
+      attendance: [{
+        id: "2026-07-27__15%3A00__paused",
+        studentId: "paused",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+        arrivalTime: "14:58",
+      }],
+    });
+    expect(html).toContain("在讀生");
+    expect(html).not.toContain("停課生");
+    expect(html).toContain('<div class="stat-value">1</div>');
+    expect(html).toContain('<div class="stat-label">當日已到班</div><div class="stat-value">0</div>');
+  });
 });

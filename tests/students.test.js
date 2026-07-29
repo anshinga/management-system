@@ -6,7 +6,11 @@ import {
   resolvePreviousLessonFields,
 } from "../js/domain/records.js";
 import { renderRecords } from "../js/views/records.js";
-import { renderStudents, sortStudents } from "../js/views/students.js";
+import {
+  renderStudents,
+  renderStudentStatusSelect,
+  sortStudents,
+} from "../js/views/students.js";
 
 const students = [
   { id: "a", name: "甲", grade: 3, currentLessonCount: 8, currentTerm: 1, status: "active" },
@@ -24,6 +28,29 @@ describe("學生管理", () => {
   test("排序選項會保留在重新渲染的畫面中", () => {
     const html = renderStudents({ students }, { sort: "lessons-desc" });
     expect(html).toContain('value="lessons-desc" selected');
+  });
+
+  test("停課學生永遠排列在在讀學生下方", () => {
+    const pausedStudent = {
+      id: "paused",
+      name: "停課生",
+      grade: 1,
+      currentLessonCount: 23,
+      currentTerm: 1,
+      status: "paused",
+    };
+    expect(sortStudents([...students, pausedStudent], "grade").at(-1).id).toBe("paused");
+    expect(sortStudents([...students, pausedStudent], "lessons-desc").at(-1).id).toBe("paused");
+    expect(sortStudents([...students, pausedStudent], "lessons-asc").at(-1).id).toBe("paused");
+  });
+
+  test("編輯視窗狀態標籤會顯示在讀或停課選項", () => {
+    expect(renderStudentStatusSelect(students[0])).toContain("student-status-select active");
+    expect(renderStudentStatusSelect(students[0])).toContain('value="active" selected');
+    expect(renderStudentStatusSelect({ ...students[0], status: "paused" }))
+      .toContain("student-status-select paused");
+    expect(renderStudentStatusSelect({ ...students[0], status: "paused" }))
+      .toContain('value="paused" selected');
   });
 
   test("學生備註會顯示摘要並出現在編輯表單", () => {
@@ -190,6 +217,16 @@ describe("固定雙月紀錄", () => {
     expect(period).toContain("2026-05-10");
     expect(period).toContain("2026-06-30");
     expect(period).not.toContain("2026-07-27");
+  });
+
+  test("停課學生的歷史點名紀錄仍會保留顯示", () => {
+    const html = renderRecords({
+      students: [{ ...students[0], status: "paused" }],
+      attendance: [attendance[2]],
+    }, { todayDate: "2026-07-27" });
+    expect(html).toContain("甲");
+    expect(html).toContain("2026-07-27");
+    expect(html).toContain("第 8 堂");
   });
 
   test("沒有日期也沒有正式紀錄時維持空資料提示", () => {

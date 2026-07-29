@@ -23,6 +23,8 @@ function getGradeOptions(state) {
 export function sortStudents(students, sort = defaultSort) {
   const compareName = (a, b) => a.name.localeCompare(b.name);
   return [...students].sort((a, b) => {
+    const statusDifference = (a.status === "paused" ? 1 : 0) - (b.status === "paused" ? 1 : 0);
+    if (statusDifference) return statusDifference;
     if (sort === "lessons-desc") {
       return b.currentLessonCount - a.currentLessonCount || a.grade - b.grade || compareName(a, b);
     }
@@ -50,6 +52,12 @@ export function renderStudents(state, filters = {}) {
 function renderRow(student) {
   const noteSummary = summarizeNote(student.note);
   return `<tr><td><strong>${escapeHtml(student.name)}</strong>${student.paymentPending ? ` <span class="pending-badge">${student.pendingPaymentCount} 期待付款</span>` : ""}${noteSummary ? `<div class="student-note-summary" title="${escapeAttribute(student.note)}">${escapeHtml(noteSummary)}</div>` : ""}</td><td>${student.grade} 年級</td><td>${student.currentLessonCount} / 24</td><td>第 ${student.currentTerm} 期</td><td><span class="status-badge ${student.status}">${student.status === "active" ? "在讀" : "停課"}</span></td><td><button class="button-secondary" data-action="edit-student" data-student-id="${escapeAttribute(student.id)}">編輯</button></td></tr>`;
+}
+
+export function renderStudentStatusSelect(student) {
+  if (!student) return "";
+  const status = student.status === "paused" ? "paused" : "active";
+  return `<select class="student-status-select ${status}" name="status" aria-label="學生狀態"><option value="active"${status === "active" ? " selected" : ""}>在讀</option><option value="paused"${status === "paused" ? " selected" : ""}>停課</option></select>`;
 }
 
 export function bindStudents(app, state, refresh, showToast) {
@@ -81,7 +89,7 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
   modal.setAttribute("aria-labelledby", "student-modal-title");
   const form = document.createElement("form");
   form.className = "modal-form";
-  form.innerHTML = `<div class="modal-head"><h3 id="student-modal-title">${student ? "編輯學生" : "新增學生"}</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label>姓名</label><input class="input" name="name" required maxlength="100" value="${escapeAttribute(student?.name || "")}" /></div><div class="field"><label>年級</label><input class="input" name="grade" type="number" min="1" max="20" required value="${student?.grade ?? 1}" /></div><div class="field"><label>目前堂數</label><input class="input" name="currentLessonCount" type="number" min="0" max="23" required value="${student?.currentLessonCount ?? 0}" /></div><div class="field"><label>目前期數</label><input class="input" name="currentTerm" type="number" min="1" required value="${student?.currentTerm ?? 1}" /></div><div class="field"><label>上一次上課日期（選填）</label><input class="input" name="previousLessonDate" type="date" max="${getTodayDate()}" value="${escapeAttribute(student?.previousLessonDate || "")}" /><small class="student-subtitle">僅作為舊資料起點，不會建立或修改點名紀錄。</small></div><div class="field field-wide"><label for="student-note">備註</label><textarea class="input" id="student-note" name="note" maxlength="1000" rows="4" placeholder="可輸入學生備註">${escapeHtml(student?.note || "")}</textarea><small class="student-subtitle">最多 1000 字。</small></div></div><div class="form-actions"><button class="button-primary" type="submit">儲存</button><button class="button-secondary" type="button" data-cancel>取消</button></div>`;
+  form.innerHTML = `<div class="modal-head"><div class="student-modal-title-row"><h3 id="student-modal-title">${student ? "編輯學生" : "新增學生"}</h3>${renderStudentStatusSelect(student)}</div><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label>姓名</label><input class="input" name="name" required maxlength="100" value="${escapeAttribute(student?.name || "")}" /></div><div class="field"><label>年級</label><input class="input" name="grade" type="number" min="1" max="20" required value="${student?.grade ?? 1}" /></div><div class="field"><label>目前堂數</label><input class="input" name="currentLessonCount" type="number" min="0" max="23" required value="${student?.currentLessonCount ?? 0}" /></div><div class="field"><label>目前期數</label><input class="input" name="currentTerm" type="number" min="1" required value="${student?.currentTerm ?? 1}" /></div><div class="field"><label>上一次上課日期（選填）</label><input class="input" name="previousLessonDate" type="date" max="${getTodayDate()}" value="${escapeAttribute(student?.previousLessonDate || "")}" /><small class="student-subtitle">僅作為舊資料起點，不會建立或修改點名紀錄。</small></div><div class="field field-wide"><label for="student-note">備註</label><textarea class="input" id="student-note" name="note" maxlength="1000" rows="4" placeholder="可輸入學生備註">${escapeHtml(student?.note || "")}</textarea><small class="student-subtitle">最多 1000 字。</small></div></div><div class="form-actions"><button class="button-primary" type="submit">儲存</button><button class="button-secondary" type="button" data-cancel>取消</button></div>`;
   modal.append(form);
   backdrop.append(modal);
   app.append(backdrop);
@@ -91,6 +99,11 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
   modal.addEventListener("keydown", (event) => { if (event.key === "Escape") closeModal(); });
   form.querySelector("[data-close-modal]").addEventListener("click", closeModal);
   form.querySelector("[data-cancel]").addEventListener("click", closeModal);
+  const statusSelect = form.querySelector('[name="status"]');
+  statusSelect?.addEventListener("change", () => {
+    statusSelect.classList.toggle("active", statusSelect.value === "active");
+    statusSelect.classList.toggle("paused", statusSelect.value === "paused");
+  });
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const submitButton = form.querySelector('[type="submit"]');
@@ -104,7 +117,7 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
       currentTerm: Number(data.get("currentTerm")),
       previousLessonDate: data.get("previousLessonDate"),
       note: data.get("note"),
-      status: student?.status || "active",
+      status: student ? data.get("status") : "active",
       pendingPaymentCount: student?.pendingPaymentCount || 0,
       paymentPending: Boolean(student?.paymentPending),
     };
@@ -115,6 +128,7 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
         || baseInput.currentLessonCount !== Number(student.currentLessonCount)
         || baseInput.currentTerm !== Number(student.currentTerm)
         || baseInput.previousLessonDate !== String(student.previousLessonDate || "")
+        || baseInput.status !== student.status
       );
       const noteChanged = String(baseInput.note || "").trim() !== String(student?.note || "").trim();
       if (!student) {

@@ -37,11 +37,24 @@ export function renderRollCall(state, refresh) {
   const weekday = getWeekday(dateObject);
   const pageTitle = date === getTodayDate() ? "今日點名" : "歷史點名";
   const season = getSeasonForDate(state, date);
-  const todaySchedules = SCHEDULE_SLOTS.map((slot) => ({
-    slot,
-    schedule: getSchedule(state, date, slot, season?.id) || { studentIds: [] },
-  }));
-  const present = state.attendance.filter((item) => item.dateKey === date).length;
+  const activeStudentIds = new Set(
+    state.students.filter((student) => student.status === "active").map((student) => student.id),
+  );
+  const todaySchedules = SCHEDULE_SLOTS.map((slot) => {
+    const schedule = getSchedule(state, date, slot, season?.id) || { studentIds: [] };
+    return {
+      slot,
+      schedule: {
+        ...schedule,
+        studentIds: schedule.studentIds.filter((studentId) => (
+          getStudent(state, studentId)?.status === "active"
+        )),
+      },
+    };
+  });
+  const present = state.attendance.filter((item) => (
+    item.dateKey === date && activeStudentIds.has(item.studentId)
+  )).length;
   const pending = state.billingCycles.filter((cycle) => cycle.status === "pending").length;
   const activeStudents = todaySchedules.flatMap(({ schedule }) => schedule.studentIds).filter((id, index, list) => list.indexOf(id) === index);
 

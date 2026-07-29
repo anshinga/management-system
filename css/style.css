@@ -151,6 +151,7 @@ textarea.input { resize: vertical; }
 .roll-call-mobile-meta, .roll-call-mobile-label { display: none; }
 .student-subtitle { color: var(--muted); font-size: 12px; }
 .student-note-summary { color: var(--muted); font-size: 12px; margin-top: 3px; max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.student-mobile-value { display: none; }
 .grade-badge, .status-badge, .pending-badge {
   border-radius: 99px;
   display: inline-flex;
@@ -474,6 +475,63 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .temporary-student-card strong { font-size: 12px; }
   .attendance-actions { align-self: stretch; justify-content: space-between; }
   .roll-call-student-card .attendance-actions { align-self: center; }
+  .students-page-head {
+    align-items: center;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .students-page-title { min-width: 0; }
+  .students-page-title .eyebrow,
+  .students-page-title > p:last-child { display: none; }
+  .students-page-title h2 { margin: 0; }
+  .students-page-head [data-action="toggle-student-form"] {
+    font-size: 12px;
+    padding: 7px 9px;
+    white-space: nowrap;
+  }
+  .students-toolbar .toolbar-start {
+    display: grid;
+    gap: 7px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+  }
+  .students-toolbar #student-search { grid-column: 1 / -1; width: 100%; }
+  .students-toolbar .select { min-width: 0; width: 100%; }
+  .students-table-panel { border-radius: 10px; padding: 0; }
+  .students-table-panel .schedule-wrap { overflow-x: auto; }
+  .students-table {
+    min-width: 340px;
+    table-layout: fixed;
+  }
+  .students-table th,
+  .students-table td {
+    font-size: 11px;
+    padding: 8px 3px;
+    text-align: center;
+  }
+  .students-table th:first-child,
+  .students-table td:first-child {
+    padding-left: 7px;
+    text-align: left;
+    width: 88px;
+  }
+  .students-table th:nth-child(2) { width: 34px; }
+  .students-table th:nth-child(3) { width: 36px; }
+  .students-table th:nth-child(4) { width: 34px; }
+  .students-table th:nth-child(5) { width: 48px; }
+  .students-table th:nth-child(6) { width: 48px; }
+  .students-table .student-note-summary { display: none; }
+  .students-table .pending-badge { font-size: 9px; padding: 1px 4px; }
+  .student-desktop-value { display: none; }
+  .student-mobile-value { display: inline; }
+  .students-table .status-badge { font-size: 10px; padding: 2px 5px; }
+  .student-edit-button {
+    font-size: 11px;
+    padding: 5px 7px;
+    white-space: nowrap;
+    writing-mode: horizontal-tb;
+  }
   .form-grid { grid-template-columns: 1fr 1fr; }
   .form-grid .field:first-child { grid-column: span 2; }
   .form-actions { grid-column: span 2; }

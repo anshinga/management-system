@@ -30,6 +30,14 @@ describe("學生管理", () => {
     expect(html).toContain('value="lessons-desc" selected');
   });
 
+  test("學生列表同時提供桌面完整值與手機精簡值", () => {
+    const html = renderStudents({ students: [students[1]] });
+    expect(html).toContain('<span class="student-desktop-value">1 年級</span><span class="student-mobile-value">1</span>');
+    expect(html).toContain('<span class="student-desktop-value">20 / 24</span><span class="student-mobile-value">20</span>');
+    expect(html).toContain('<span class="student-desktop-value">第 1 期</span><span class="student-mobile-value">1</span>');
+    expect(html).toContain("student-edit-button");
+  });
+
   test("停課學生永遠排列在在讀學生下方", () => {
     const pausedStudent = {
       id: "paused",

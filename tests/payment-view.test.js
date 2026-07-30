@@ -26,7 +26,7 @@ describe("payment reminder view", () => {
     });
 
     expect(html).toContain("繳費提醒");
-    expect(html).toContain("完成第 20 堂");
+    expect(html).toContain("目前第 20 堂");
     expect(html).toContain('data-action="mark-payment-paid"');
     expect(html).toContain("已繳費");
     expect(html).not.toContain("付款歷史");

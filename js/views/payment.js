@@ -19,6 +19,11 @@ function sortedReminderItems(state) {
     ));
 }
 
+function displayLessonCount(student) {
+  const lessonCount = Number(student?.currentLessonCount);
+  return Number.isInteger(lessonCount) ? lessonCount : "—";
+}
+
 export function renderPayment(state) {
   const reminders = sortedReminderItems(state);
   const rows = reminders.map((item) => `
@@ -27,7 +32,7 @@ export function renderPayment(state) {
         <span class="grade-badge">${item.student?.grade ?? "—"} 年級</span>
         <div>
           <strong>${escapeHtml(item.student?.name || "未知學生")}</strong>
-          <div class="payment-count">第 ${item.term} 期・完成第 20 堂，請確認繳費</div>
+          <div class="payment-count">第 ${item.term} 期・目前第 ${displayLessonCount(item.student)} 堂，請確認繳費</div>
         </div>
       </div>
       <label class="payment-paid-check">

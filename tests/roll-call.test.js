@@ -118,6 +118,31 @@ describe("roll-call view", () => {
     expect(html).not.toContain("pending-badge");
   });
 
+  test("舊資料完成第 20 堂但尚無提醒文件時，姓名仍會顯示紅色", () => {
+    const html = renderRollCall({
+      ...state,
+      students: [{
+        id: "student-1",
+        name: "允涵",
+        grade: 7,
+        status: "active",
+        currentLessonCount: 20,
+        currentTerm: 2,
+        paymentPending: false,
+        pendingPaymentCount: 0,
+      }],
+      schedules: [{
+        id: "summer-2026-2026-07-27-15:00",
+        season: "summer-2026",
+        date: "2026-07-27",
+        slot: "15:00",
+        studentIds: ["student-1"],
+      }],
+    });
+
+    expect(html).toContain('<div class="student-name is-payment-pending">允涵</div>');
+  });
+
   test("同一學生一天排兩堂會計為兩人次，且各堂顯示自己的點名堂數", () => {
     const html = renderRollCall({
       ...state,

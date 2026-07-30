@@ -48,14 +48,14 @@ export async function markAttendance({ studentId, dateKey, slot, arrivalTime }) 
     const student = studentSnapshot.data();
     const term = Number(student.currentTerm);
     const lessonNumber = Number(student.currentLessonCount) + 1;
+    const createsPaymentReminder = lessonNumber === 20;
     const completesTerm = lessonNumber === 24;
     let cycleRef;
     let cycleSnapshot;
 
-    if (completesTerm) {
+    if (createsPaymentReminder) {
       cycleRef = workspaceDocumentRef(COLLECTIONS.billingCycles, makeBillingCycleId(studentId, term));
       cycleSnapshot = await transaction.get(cycleRef);
-      if (cycleSnapshot.exists()) throw new Error("這一期已經完成，請重新整理後再試。");
     }
 
     transaction.set(recordRef, {
@@ -70,11 +70,10 @@ export async function markAttendance({ studentId, dateKey, slot, arrivalTime }) 
       updatedAt: serverTimestamp(),
     });
 
-    if (completesTerm) {
+    if (createsPaymentReminder && !cycleSnapshot.exists()) {
       const pendingPaymentCount = Number(student.pendingPaymentCount || 0) + 1;
       transaction.update(studentRef, {
-        currentLessonCount: 0,
-        currentTerm: term + 1,
+        currentLessonCount: lessonNumber,
         pendingPaymentCount,
         paymentPending: true,
         updatedAt: serverTimestamp(),
@@ -84,9 +83,18 @@ export async function markAttendance({ studentId, dateKey, slot, arrivalTime }) 
         term,
         status: "pending",
         paymentId: "",
-        completedAt: serverTimestamp(),
+        reminderAt: serverTimestamp(),
         paidAt: null,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return;
+    }
+
+    if (completesTerm) {
+      transaction.update(studentRef, {
+        currentLessonCount: 0,
+        currentTerm: term + 1,
         updatedAt: serverTimestamp(),
       });
       return;
@@ -130,10 +138,17 @@ export async function removeLatestAttendance(attendanceId) {
   }
 
   const studentRef = workspaceDocumentRef(COLLECTIONS.students, record.studentId);
+  const cycleRef = Number(record.lessonNumber) === 20
+    ? workspaceDocumentRef(
+      COLLECTIONS.billingCycles,
+      makeBillingCycleId(record.studentId, record.term),
+    )
+    : null;
   await runTransaction(db, async (transaction) => {
-    const [freshRecord, studentSnapshot] = await Promise.all([
+    const [freshRecord, studentSnapshot, cycleSnapshot] = await Promise.all([
       transaction.get(recordRef),
       transaction.get(studentRef),
+      cycleRef ? transaction.get(cycleRef) : Promise.resolve(null),
     ]);
     if (!freshRecord.exists() || !studentSnapshot.exists()) throw new Error("點名或學生資料已不存在。");
     const student = studentSnapshot.data();
@@ -141,8 +156,18 @@ export async function removeLatestAttendance(attendanceId) {
       throw new Error("已結算期別的點名不可刪除；請保留紀錄並另行備註調整。");
     }
     transaction.delete(recordRef);
+    const removesPendingReminder = cycleSnapshot?.exists()
+      && cycleSnapshot.data().status === "pending";
+    if (removesPendingReminder) transaction.delete(cycleRef);
+    const pendingPaymentCount = removesPendingReminder
+      ? Math.max(0, Number(student.pendingPaymentCount || 0) - 1)
+      : Number(student.pendingPaymentCount || 0);
     transaction.update(studentRef, {
       currentLessonCount: Math.max(0, Number(student.currentLessonCount || 0) - 1),
+      ...(removesPendingReminder ? {
+        pendingPaymentCount,
+        paymentPending: pendingPaymentCount > 0,
+      } : {}),
       updatedAt: serverTimestamp(),
     });
   });

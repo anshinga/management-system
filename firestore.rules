@@ -195,19 +195,45 @@ service cloud.firestore {
         && data.paymentPending == (data.pendingPaymentCount > 0);
     }
 
-    function validTeacherProgressUpdate() {
+    function validTeacherProgressUpdate(workspaceId, studentId) {
       return request.resource.data.diff(resource.data).affectedKeys()
         .hasOnly(["currentLessonCount", "currentTerm", "pendingPaymentCount", "paymentPending", "updatedAt"])
         && (
           (
             request.resource.data.currentTerm == resource.data.currentTerm
-            && request.resource.data.pendingPaymentCount == resource.data.pendingPaymentCount
-            && request.resource.data.paymentPending == resource.data.paymentPending
+            && request.resource.data.currentLessonCount == resource.data.currentLessonCount + 1
             && (
-              request.resource.data.currentLessonCount == resource.data.currentLessonCount + 1
+              (
+                request.resource.data.currentLessonCount == 20
+                && (
+                  (
+                    !exists(billingCyclePath(
+                      workspaceId,
+                      studentId + "__" + string(resource.data.currentTerm)
+                    ))
+                    && existsAfter(billingCyclePath(
+                      workspaceId,
+                      studentId + "__" + string(resource.data.currentTerm)
+                    ))
+                    && request.resource.data.pendingPaymentCount
+                      == resource.data.pendingPaymentCount + 1
+                    && request.resource.data.paymentPending == true
+                  )
+                  || (
+                    exists(billingCyclePath(
+                      workspaceId,
+                      studentId + "__" + string(resource.data.currentTerm)
+                    ))
+                    && request.resource.data.pendingPaymentCount
+                      == resource.data.pendingPaymentCount
+                    && request.resource.data.paymentPending == resource.data.paymentPending
+                  )
+                )
+              )
               || (
-                resource.data.currentLessonCount > 0
-                && request.resource.data.currentLessonCount == resource.data.currentLessonCount - 1
+                request.resource.data.currentLessonCount != 20
+                && request.resource.data.pendingPaymentCount == resource.data.pendingPaymentCount
+                && request.resource.data.paymentPending == resource.data.paymentPending
               )
             )
           )
@@ -215,8 +241,49 @@ service cloud.firestore {
             resource.data.currentLessonCount == 23
             && request.resource.data.currentLessonCount == 0
             && request.resource.data.currentTerm == resource.data.currentTerm + 1
-            && request.resource.data.pendingPaymentCount == resource.data.pendingPaymentCount + 1
-            && request.resource.data.paymentPending == true
+            && request.resource.data.pendingPaymentCount == resource.data.pendingPaymentCount
+            && request.resource.data.paymentPending == resource.data.paymentPending
+          )
+          || (
+            resource.data.currentLessonCount > 0
+            && request.resource.data.currentTerm == resource.data.currentTerm
+            && request.resource.data.currentLessonCount == resource.data.currentLessonCount - 1
+            && (
+              (
+                resource.data.currentLessonCount == 20
+                && exists(billingCyclePath(
+                  workspaceId,
+                  studentId + "__" + string(resource.data.currentTerm)
+                ))
+                && get(billingCyclePath(
+                  workspaceId,
+                  studentId + "__" + string(resource.data.currentTerm)
+                )).data.status == "pending"
+                && !existsAfter(billingCyclePath(
+                  workspaceId,
+                  studentId + "__" + string(resource.data.currentTerm)
+                ))
+                && request.resource.data.pendingPaymentCount
+                  == resource.data.pendingPaymentCount - 1
+                && request.resource.data.paymentPending
+                  == (request.resource.data.pendingPaymentCount > 0)
+              )
+              || (
+                (
+                  resource.data.currentLessonCount != 20
+                  || !exists(billingCyclePath(
+                    workspaceId,
+                    studentId + "__" + string(resource.data.currentTerm)
+                  ))
+                  || get(billingCyclePath(
+                    workspaceId,
+                    studentId + "__" + string(resource.data.currentTerm)
+                  )).data.status != "pending"
+                )
+                && request.resource.data.pendingPaymentCount == resource.data.pendingPaymentCount
+                && request.resource.data.paymentPending == resource.data.paymentPending
+              )
+            )
           )
         );
     }
@@ -325,18 +392,21 @@ service cloud.firestore {
     }
 
     function validBillingCycle(data) {
-      return data.keys().hasAll(["studentId", "term", "status", "paymentId", "completedAt", "paidAt", "createdAt", "updatedAt"])
-        && data.keys().hasOnly(["studentId", "term", "status", "paymentId", "completedAt", "paidAt", "createdAt", "updatedAt"])
+      return data.keys().hasAll(["studentId", "term", "status", "paymentId", "paidAt", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "term", "status", "paymentId", "reminderAt", "completedAt", "paidAt", "createdAt", "updatedAt"])
         && isSafeDocumentId(data.studentId)
         && data.term is int
         && data.term >= 1
         && data.status in ["pending", "paid"]
         && data.paymentId is string
-        && data.completedAt is timestamp
+        && (
+          (data.keys().hasAny(["reminderAt"]) && data.reminderAt is timestamp)
+          || (data.keys().hasAny(["completedAt"]) && data.completedAt is timestamp)
+        )
         && (data.paidAt == null || data.paidAt is timestamp)
         && (
           (data.status == "pending" && data.paymentId == "" && data.paidAt == null)
-          || (data.status == "paid" && data.paymentId.size() > 0 && data.paidAt is timestamp)
+          || (data.status == "paid" && data.paidAt is timestamp)
         );
     }
 
@@ -394,7 +464,7 @@ service cloud.firestore {
             isOwner(workspaceId)
             || (
               canTeach(workspaceId)
-              && validTeacherProgressUpdate()
+              && validTeacherProgressUpdate(workspaceId, studentId)
             )
           );
         allow delete: if isOwner(workspaceId);
@@ -490,22 +560,6 @@ service cloud.firestore {
               && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
                 == request.resource.data.term + 1
               && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentLessonCount == 0
-              && existsAfter(billingCyclePath(
-                workspaceId,
-                expectedBillingCycleId(request.resource.data)
-              ))
-              && getAfter(billingCyclePath(
-                workspaceId,
-                expectedBillingCycleId(request.resource.data)
-              )).data.studentId == request.resource.data.studentId
-              && getAfter(billingCyclePath(
-                workspaceId,
-                expectedBillingCycleId(request.resource.data)
-              )).data.term == request.resource.data.term
-              && getAfter(billingCyclePath(
-                workspaceId,
-                expectedBillingCycleId(request.resource.data)
-              )).data.status == "pending"
             )
           );
         allow update: if canTeach(workspaceId)
@@ -524,42 +578,104 @@ service cloud.firestore {
           && getAfter(studentPath(workspaceId, resource.data.studentId)).data
             .diff(get(studentPath(workspaceId, resource.data.studentId)).data)
             .affectedKeys()
-            .hasOnly(["currentLessonCount", "updatedAt"]);
+            .hasOnly(["currentLessonCount", "pendingPaymentCount", "paymentPending", "updatedAt"])
+          && (
+            resource.data.lessonNumber != 20
+            || !exists(billingCyclePath(
+              workspaceId,
+              expectedBillingCycleId(resource.data)
+            ))
+            || get(billingCyclePath(
+              workspaceId,
+              expectedBillingCycleId(resource.data)
+            )).data.status != "pending"
+            || !existsAfter(billingCyclePath(
+              workspaceId,
+              expectedBillingCycleId(resource.data)
+            ))
+          );
       }
 
       match /billingCycles/{billingCycleId} {
         allow read: if canRead(workspaceId);
-        allow create: if canTeach(workspaceId)
-          && billingCycleId == expectedBillingCycleId(request.resource.data)
-          && validBillingCycle(request.resource.data)
-          && request.resource.data.status == "pending"
-          && hasCreateTimestamps(request.resource.data)
-          && request.resource.data.completedAt == request.time
-          && exists(studentPath(workspaceId, request.resource.data.studentId))
-          && request.resource.data.term == get(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
-          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
-            == request.resource.data.term + 1
-          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
-            == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount + 1
-          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending == true;
+        allow create: if (
+            isOwner(workspaceId)
+            && billingCycleId == expectedBillingCycleId(request.resource.data)
+            && validBillingCycle(request.resource.data)
+            && hasCreateTimestamps(request.resource.data)
+            && request.resource.data.paymentId == ""
+            && request.resource.data.reminderAt == request.time
+            && exists(studentPath(workspaceId, request.resource.data.studentId))
+            && request.resource.data.term
+              == get(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
+            && get(studentPath(workspaceId, request.resource.data.studentId)).data.currentLessonCount >= 20
+            && (
+              (
+                request.resource.data.status == "pending"
+                && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
+                  == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount + 1
+                && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending == true
+              )
+              || (
+                request.resource.data.status == "paid"
+                && request.resource.data.paidAt == request.time
+                && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data
+                  == get(studentPath(workspaceId, request.resource.data.studentId)).data
+              )
+            )
+          )
+          || (
+            canTeach(workspaceId)
+            && billingCycleId == expectedBillingCycleId(request.resource.data)
+            && validBillingCycle(request.resource.data)
+            && request.resource.data.status == "pending"
+            && hasCreateTimestamps(request.resource.data)
+            && request.resource.data.reminderAt == request.time
+            && exists(studentPath(workspaceId, request.resource.data.studentId))
+            && request.resource.data.term == get(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
+            && get(studentPath(workspaceId, request.resource.data.studentId)).data.currentLessonCount == 19
+            && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.currentLessonCount == 20
+            && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
+              == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount + 1
+            && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending == true
+          );
         allow update: if isOwner(workspaceId)
           && billingCycleId == expectedBillingCycleId(request.resource.data)
           && validBillingCycle(request.resource.data)
           && resource.data.status == "pending"
           && request.resource.data.status == "paid"
           && request.resource.data.createdAt == resource.data.createdAt
-          && request.resource.data.completedAt == resource.data.completedAt
           && request.resource.data.updatedAt == request.time
           && request.resource.data.paidAt == request.time
-          && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(["status", "paymentId", "paidAt", "updatedAt"])
-          && existsAfter(paymentPath(workspaceId, request.resource.data.paymentId))
-          && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.billingCycleId == billingCycleId
           && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
             == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount - 1
           && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending
-            == (getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount > 0);
-        allow delete: if false;
+            == (getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount > 0)
+          && (
+            (
+              request.resource.data.paymentId == resource.data.paymentId
+              && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(["status", "paidAt", "updatedAt"])
+            )
+            || (
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(["status", "paymentId", "paidAt", "updatedAt"])
+              && request.resource.data.paymentId.size() > 0
+              && existsAfter(paymentPath(workspaceId, request.resource.data.paymentId))
+              && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.billingCycleId == billingCycleId
+            )
+          );
+        allow delete: if canTeach(workspaceId)
+          && resource.data.status == "pending"
+          && exists(studentPath(workspaceId, resource.data.studentId))
+          && resource.data.term
+            == get(studentPath(workspaceId, resource.data.studentId)).data.currentTerm
+          && get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount == 20
+          && getAfter(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount == 19
+          && getAfter(studentPath(workspaceId, resource.data.studentId)).data.pendingPaymentCount
+            == get(studentPath(workspaceId, resource.data.studentId)).data.pendingPaymentCount - 1
+          && getAfter(studentPath(workspaceId, resource.data.studentId)).data.paymentPending
+            == (getAfter(studentPath(workspaceId, resource.data.studentId)).data.pendingPaymentCount > 0);
       }
 
       match /payments/{paymentId} {

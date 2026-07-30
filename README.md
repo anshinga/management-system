@@ -8,7 +8,7 @@
 - `index.html` 透過 Firebase 官方 CDN import map 載入 Firebase Web SDK。
 - Google Authentication 負責登入；實際資料權限由 `workspaces/mpm-main/members` 與 Firestore Security Rules 共同決定。
 - `students`、`seasons`、`scheduleEntries`、`scheduleOverrides`、`attendance`、`billingCycles`、`payments` 分開保存，介面透過 Firestore 即時監聽同步。
-- 第 24 堂點名會在同一個 transaction 內推進學生期數並建立待付款期別；付款 transaction 會新增不可修改的付款歷史並結清期別。
+- 完成第 20 堂時會在同一個 transaction 內建立繳費提醒；第 24 堂只推進學生期數。確認已繳費後會解除提醒，不再要求輸入金額、方式或備註。
 - `localStorage` 只保存深色模式與目前選取的點名日期，不保存業務資料。
 - Firebase 專案為 `denmin-b0a26`，預設工作區為 `mpm-main`。
 
@@ -65,3 +65,12 @@ npx.cmd firebase deploy --only functions,firestore
 GitHub Pages 仍照原本流程發布 `index.html`、`booking.html`、`css/` 與 `js/`。若只更新 GitHub Pages、未部署 Functions 與 Rules，選課連結將無法讀取或送出。
 
 活動開放時會以當下既有排課計算可登記名額。為避免名額計數與實際排課不同，活動開放期間不要再人工增減該活動的日期與時段；如需調整，應先提前截止活動。
+
+## 繳費提醒
+
+- 學生完成每一期第 20 堂後建立待繳費提醒。
+- 待確認學生在今日點名頁以紅色姓名顯示。
+- 「繳費」頁只提供提醒名單與一次性的「已繳費」確認。
+- 確認後記錄提醒期別與 `paidAt`，並立即解除紅字提醒。
+- 舊有 `payments` 付款歷史保留但不再顯示或新增，避免破壞既有資料。
+- 未來可由 LINE Bot 讀取待處理的 `billingCycles`；目前尚未實作 LINE 串接。

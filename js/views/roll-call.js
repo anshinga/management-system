@@ -12,6 +12,10 @@ import {
 } from "../store.js";
 import { getScheduleSlotsForWeekday } from "../domain/schedule.js";
 import {
+  getPaymentReminderItems,
+  needsPaymentReminder,
+} from "../domain/payments.js";
+import {
   markAttendance,
   removeLatestAttendance,
   updateAttendanceTime,
@@ -56,7 +60,7 @@ export function renderRollCall(state, refresh) {
   const present = state.attendance.filter((item) => (
     item.dateKey === date && activeStudentIds.has(item.studentId)
   )).length;
-  const pending = state.billingCycles.filter((cycle) => cycle.status === "pending").length;
+  const pending = getPaymentReminderItems(state.students, state.billingCycles).length;
   const scheduledPersonCount = todaySchedules.reduce((
     count,
     { schedule },
@@ -93,7 +97,8 @@ function renderStudent(state, date, slot, id, refresh) {
   const record = state.attendance.find((item) => item.studentId === id && item.dateKey === date && item.slot === slot);
   if (!student) return "";
   const displayedLessonNumber = record?.lessonNumber ?? student.currentLessonCount;
-  return `<article class="student-card roll-call-student-card ${record ? "is-present" : ""}"><div class="student-summary"><div><div class="student-name-row"><div class="student-name${student.paymentPending ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${displayedLessonNumber} 堂</div><div class="roll-call-mobile-meta">${displayedLessonNumber} / ${record ? escapeHtml(record.arrivalTime) : "未到"}</div></div></div><div class="attendance-actions">${record ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>` : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}">到班</button>`}</div></article>`;
+  const paymentReminder = needsPaymentReminder(student, state.billingCycles);
+  return `<article class="student-card roll-call-student-card ${record ? "is-present" : ""}"><div class="student-summary"><div><div class="student-name-row"><div class="student-name${paymentReminder ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${displayedLessonNumber} 堂</div><div class="roll-call-mobile-meta">${displayedLessonNumber} / ${record ? escapeHtml(record.arrivalTime) : "未到"}</div></div></div><div class="attendance-actions">${record ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>` : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}">到班</button>`}</div></article>`;
 }
 
 function closeAttendanceModal(backdrop) {

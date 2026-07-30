@@ -404,6 +404,20 @@ textarea.input { resize: vertical; }
 .payment-row { align-items: center; display: flex; justify-content: space-between; padding: 15px 17px; }
 .payment-info { align-items: center; display: flex; gap: 12px; }
 .payment-count { color: var(--warning); font-size: 13px; }
+.payment-paid-check {
+  align-items: center;
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-weight: 600;
+  gap: 7px;
+  padding: 8px 11px;
+}
+.payment-paid-check:has(input:checked) { background: #e5f2e8; border-color: #b8d4be; color: var(--success); }
+.payment-paid-check:has(input:disabled) { cursor: wait; opacity: .65; }
 .modal-backdrop { align-items: center; background: rgb(0 0 0 / 35%); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 10; }
 .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 90vh; max-width: 520px; overflow: auto; padding: 20px; width: 100%; }
 .modal-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 15px; }

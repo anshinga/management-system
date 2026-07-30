@@ -297,10 +297,10 @@ describe("Firestore Security Rules", () => {
     }));
   });
 
-  test("第 24 堂必須同時開啟下一期並建立待付款期別", async () => {
+  test("第 20 堂必須同時建立待繳費提醒", async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await updateDoc(workspaceDocument(context.firestore(), "students", "student-1"), {
-        currentLessonCount: 23,
+        currentLessonCount: 19,
       });
     });
     const database = testEnvironment.authenticatedContext("teacher-uid", {
@@ -317,15 +317,14 @@ describe("Firestore Security Rules", () => {
         dateKey: "2026-07-27",
         slot: "16:30",
         arrivalTime: "16:28",
-        lessonNumber: 24,
+        lessonNumber: 20,
         term: 1,
         recordedBy: "teacher-uid",
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
       transaction.update(student, {
-        currentLessonCount: 0,
-        currentTerm: studentSnapshot.data().currentTerm + 1,
+        currentLessonCount: 20,
         pendingPaymentCount: studentSnapshot.data().pendingPaymentCount + 1,
         paymentPending: true,
         updatedAt: serverTimestamp(),
@@ -335,7 +334,7 @@ describe("Firestore Security Rules", () => {
         term: 1,
         status: "pending",
         paymentId: "",
-        completedAt: serverTimestamp(),
+        reminderAt: serverTimestamp(),
         paidAt: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -343,10 +342,10 @@ describe("Firestore Security Rules", () => {
     }));
   });
 
-  test("第 24 堂缺少待付款期別時整筆交易失敗", async () => {
+  test("第 20 堂缺少待繳費提醒時整筆交易失敗", async () => {
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await updateDoc(workspaceDocument(context.firestore(), "students", "student-1"), {
-        currentLessonCount: 23,
+        currentLessonCount: 19,
       });
     });
     const database = testEnvironment.authenticatedContext("teacher-uid", {
@@ -362,6 +361,52 @@ describe("Firestore Security Rules", () => {
         dateKey: "2026-07-27",
         slot: "16:30",
         arrivalTime: "16:28",
+        lessonNumber: 20,
+        term: 1,
+        recordedBy: "teacher-uid",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      transaction.update(student, {
+        currentLessonCount: 20,
+        pendingPaymentCount: studentSnapshot.data().pendingPaymentCount + 1,
+        paymentPending: true,
+        updatedAt: serverTimestamp(),
+      });
+    }));
+  });
+
+  test("第 24 堂只推進下一期並保留既有提醒狀態", async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const adminDatabase = context.firestore();
+      await updateDoc(workspaceDocument(adminDatabase, "students", "student-1"), {
+        currentLessonCount: 23,
+        pendingPaymentCount: 1,
+        paymentPending: true,
+      });
+      await setDoc(workspaceDocument(adminDatabase, "billingCycles", "student-1__1"), {
+        studentId: "student-1",
+        term: 1,
+        status: "pending",
+        paymentId: "",
+        reminderAt: timestampFields().createdAt,
+        paidAt: null,
+        ...timestampFields(),
+      });
+    });
+    const database = testEnvironment.authenticatedContext("teacher-uid", {
+      email: "teacher@example.com",
+      email_verified: true,
+    }).firestore();
+    const student = workspaceDocument(database, "students", "student-1");
+    const attendance = workspaceDocument(database, "attendance", "2026-07-27__16%3A30__student-1");
+    await assertSucceeds(runTransaction(database, async (transaction) => {
+      const studentSnapshot = await transaction.get(student);
+      transaction.set(attendance, {
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "16:30",
+        arrivalTime: "16:28",
         lessonNumber: 24,
         term: 1,
         recordedBy: "teacher-uid",
@@ -371,14 +416,12 @@ describe("Firestore Security Rules", () => {
       transaction.update(student, {
         currentLessonCount: 0,
         currentTerm: studentSnapshot.data().currentTerm + 1,
-        pendingPaymentCount: studentSnapshot.data().pendingPaymentCount + 1,
-        paymentPending: true,
         updatedAt: serverTimestamp(),
       });
     }));
   });
 
-  test("owner 必須在同一交易中結清期別並建立不可變更的付款紀錄", async () => {
+  test("owner 必須在同一交易中解除待繳費提醒", async () => {
     const database = testEnvironment.authenticatedContext("owner-uid", {
       email: OWNER_EMAIL,
       email_verified: true,
@@ -391,7 +434,7 @@ describe("Firestore Security Rules", () => {
         term: 1,
         status: "pending",
         paymentId: "",
-        completedAt: timestamps.createdAt,
+        reminderAt: timestamps.createdAt,
         paidAt: null,
         ...timestamps,
       });
@@ -402,26 +445,18 @@ describe("Firestore Security Rules", () => {
     });
     const cycle = workspaceDocument(database, "billingCycles", "student-1__1");
     const student = workspaceDocument(database, "students", "student-1");
-    const payment = workspaceDocument(database, "payments", "payment-1");
+    await assertFails(updateDoc(cycle, {
+      status: "paid",
+      paidAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
     await assertSucceeds(runTransaction(database, async (transaction) => {
       const [cycleSnapshot, studentSnapshot] = await Promise.all([
         transaction.get(cycle),
         transaction.get(student),
       ]);
-      transaction.set(payment, {
-        billingCycleId: cycleSnapshot.id,
-        studentId: cycleSnapshot.data().studentId,
-        term: cycleSnapshot.data().term,
-        amount: 2000,
-        method: "cash",
-        paidDate: "2026-07-27",
-        note: "第一期",
-        confirmedBy: "owner-uid",
-        createdAt: serverTimestamp(),
-      });
       transaction.update(cycle, {
         status: "paid",
-        paymentId: "payment-1",
         paidAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
@@ -431,7 +466,6 @@ describe("Firestore Security Rules", () => {
         updatedAt: serverTimestamp(),
       });
     }));
-    await assertFails(updateDoc(payment, { note: "事後修改" }));
   });
 
   test("老師可刪除點名紀錄，但必須在同一交易將學生堂數減一", async () => {

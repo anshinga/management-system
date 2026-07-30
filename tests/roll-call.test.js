@@ -104,6 +104,7 @@ describe("roll-call view", () => {
         dateKey: "2026-07-27",
         slot: "15:00",
         arrivalTime: "15:12",
+        lessonNumber: 16,
       }],
     });
 
@@ -115,6 +116,60 @@ describe("roll-call view", () => {
     expect(html).not.toContain("第 2 期");
     expect(html).not.toContain("期待付款");
     expect(html).not.toContain("pending-badge");
+  });
+
+  test("同一學生一天排兩堂會計為兩人次，且各堂顯示自己的點名堂數", () => {
+    const html = renderRollCall({
+      ...state,
+      students: [{
+        id: "student-1",
+        name: "允涵",
+        grade: 7,
+        status: "active",
+        currentLessonCount: 12,
+        currentTerm: 1,
+      }],
+      schedules: [
+        {
+          id: "summer-2026-2026-07-27-15:00",
+          season: "summer-2026",
+          date: "2026-07-27",
+          slot: "15:00",
+          studentIds: ["student-1"],
+        },
+        {
+          id: "summer-2026-2026-07-27-16:30",
+          season: "summer-2026",
+          date: "2026-07-27",
+          slot: "16:30",
+          studentIds: ["student-1"],
+        },
+      ],
+      attendance: [
+        {
+          id: "2026-07-27__15%3A00__student-1",
+          studentId: "student-1",
+          dateKey: "2026-07-27",
+          slot: "15:00",
+          arrivalTime: "15:00",
+          lessonNumber: 11,
+        },
+        {
+          id: "2026-07-27__16%3A30__student-1",
+          studentId: "student-1",
+          dateKey: "2026-07-27",
+          slot: "16:30",
+          arrivalTime: "16:30",
+          lessonNumber: 12,
+        },
+      ],
+    });
+
+    expect(html).toContain('<div class="stat-label">當日課程人次</div><div class="stat-value">2</div>');
+    expect(html).toContain('<div class="student-subtitle">第 11 堂</div>');
+    expect(html).toContain('<div class="student-subtitle">第 12 堂</div>');
+    expect(html).toContain('<div class="roll-call-mobile-meta">11 / 15:00</div>');
+    expect(html).toContain('<div class="roll-call-mobile-meta">12 / 16:30</div>');
   });
 
   test("上學期週六只顯示兩個上午時段", () => {

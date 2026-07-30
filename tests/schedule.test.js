@@ -7,6 +7,7 @@ import {
   groupScheduleEntries,
   hasSaturdayMorning,
   isBreakSeason,
+  isScheduleSlotUpcoming,
   makeScheduleEntryId,
   makeScheduleOverrideId,
   makeSchedulePatternKey,
@@ -32,6 +33,16 @@ describe("schedule domain", () => {
     expect(hasSaturdayMorning(fall)).toBe(true);
     expect(getScheduleSlotsForWeekday(fall, 6)).toEqual(["09:00", "10:30"]);
     expect(getScheduleSlotsForWeekday(fall, 7)).toEqual([]);
+  });
+
+  test("新增排課只開放台北時間尚未開始的時段", () => {
+    const beforeClass = new Date("2026-07-30T06:59:00.000Z");
+    const classStarted = new Date("2026-07-30T07:00:00.000Z");
+
+    expect(isScheduleSlotUpcoming("2026-07-30", "15:00", beforeClass)).toBe(true);
+    expect(isScheduleSlotUpcoming("2026-07-30", "15:00", classStarted)).toBe(false);
+    expect(isScheduleSlotUpcoming("2026-07-31", "15:00", classStarted)).toBe(true);
+    expect(isScheduleSlotUpcoming("2026-07-29", "19:30", classStarted)).toBe(false);
   });
 
   test("排課文件 ID 對相同輸入保持穩定", () => {

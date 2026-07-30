@@ -219,16 +219,16 @@ export async function removeScheduleEntry(studentId, source) {
   });
 }
 
-export async function addTemporaryScheduleEntries(studentIds, target) {
+async function addScheduleEntriesByType(studentIds, target, temporary) {
   const uniqueStudentIds = [...new Set(studentIds)].filter(Boolean);
   if (!uniqueStudentIds.length || !target?.dateKey || !target?.slot || !target?.seasonId) {
-    throw new Error("請選擇至少一位臨時學生。");
+    throw new Error(`請選擇至少一位${temporary ? "臨時" : ""}學生。`);
   }
 
   const entries = uniqueStudentIds.map((studentId) => entryData({
     studentId,
     ...target,
-    temporary: true,
+    temporary,
   }));
   const references = entries.map(entryReference);
 
@@ -246,6 +246,14 @@ export async function addTemporaryScheduleEntries(studentIds, target) {
     });
     return addedCount;
   });
+}
+
+export function addScheduleEntries(studentIds, target) {
+  return addScheduleEntriesByType(studentIds, target, false);
+}
+
+export function addTemporaryScheduleEntries(studentIds, target) {
+  return addScheduleEntriesByType(studentIds, target, true);
 }
 
 export async function ensureScheduleWeek(date, seasonId, seasonRange = null) {

@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { SCHEDULE_SLOTS } from "../js/config.js";
 
 const ensureScheduleWeek = vi.fn(() => Promise.resolve(false));
+const addScheduleEntries = vi.fn(() => Promise.resolve(0));
 const moveScheduleEntry = vi.fn(() => Promise.resolve());
 const removeScheduleEntry = vi.fn(() => Promise.resolve());
 
 vi.mock("../js/repositories/schedule-repository.js", () => ({
+  addScheduleEntries,
   ensureScheduleWeek,
   moveScheduleEntry,
   removeScheduleEntry,
@@ -120,6 +122,7 @@ beforeEach(() => {
     setItem: (key, value) => values.set(key, String(value)),
   });
   ensureScheduleWeek.mockClear();
+  addScheduleEntries.mockClear();
   moveScheduleEntry.mockClear();
   removeScheduleEntry.mockClear();
 });
@@ -160,6 +163,36 @@ describe("schedule view", () => {
     expect(html).toContain('class="schedule-board-layout without-saturday"');
     expect(html).not.toContain("schedule-saturday-panel");
     expect(html).not.toContain("8/1 週六");
+  });
+
+  test("尚未開始的排課格顯示新增按鈕，過去或已有點名的格子不顯示", () => {
+    const futureHtml = renderSchedule(state, {
+      now: new Date("2026-07-20T00:00:00+08:00"),
+    });
+    expect(futureHtml.match(/data-action="add-schedule-students"/g)).toHaveLength(20);
+    expect(futureHtml).toContain('data-date="2026-07-27" data-slot="15:00"');
+
+    const attendedHtml = renderSchedule({
+      ...state,
+      attendance: [{
+        id: "2026-07-29__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-29",
+        slot: "15:00",
+        arrivalTime: "14:55",
+        lessonNumber: 1,
+        term: 1,
+      }],
+    }, {
+      now: new Date("2026-07-20T00:00:00+08:00"),
+    });
+    expect(attendedHtml.match(/data-action="add-schedule-students"/g)).toHaveLength(19);
+    expect(attendedHtml).not.toContain('data-action="add-schedule-students" data-date="2026-07-29" data-slot="15:00"');
+
+    const pastHtml = renderSchedule(state, {
+      now: new Date("2026-08-01T00:00:00+08:00"),
+    });
+    expect(pastHtml).not.toContain('data-action="add-schedule-students"');
   });
 
   test("過去已有點名的時段與學生會保持綠色及鎖定", () => {

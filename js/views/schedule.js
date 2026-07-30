@@ -10,8 +10,12 @@ import {
   parseDate,
 } from "../store.js";
 import { SCHEDULE_SLOTS } from "../config.js";
-import { hasSaturdayMorning } from "../domain/schedule.js";
 import {
+  hasSaturdayMorning,
+  isScheduleSlotUpcoming,
+} from "../domain/schedule.js";
+import {
+  addScheduleEntries,
   ensureScheduleWeek,
   moveScheduleEntry,
   removeScheduleEntry,
@@ -67,19 +71,19 @@ function renderSeasonSwitcher(state, selectedSeason) {
   </div>`;
 }
 
-function renderWeekdayScheduleGrid(state, dates, season) {
-  return `<div class="schedule-wrap"><div class="schedule-grid" style="--schedule-day-count: ${dates.length}"><div class="schedule-label">時間</div>${dates.map((date, index) => `<div class="schedule-day${seasonContainsDate(season, date) ? "" : " is-outside-season"}"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${dates.map((date) => renderCell(state, date, slot, season)).join("")}`).join("")}</div></div>`;
+function renderWeekdayScheduleGrid(state, dates, season, now) {
+  return `<div class="schedule-wrap"><div class="schedule-grid" style="--schedule-day-count: ${dates.length}"><div class="schedule-label">時間</div>${dates.map((date, index) => `<div class="schedule-day${seasonContainsDate(season, date) ? "" : " is-outside-season"}"><strong>${shortDate(date)} ${weekdays[index]}</strong></div>`).join("")}${SCHEDULE_SLOTS.map((slot) => `<div class="schedule-label">${slot}</div>${dates.map((date) => renderCell(state, date, slot, season, now)).join("")}`).join("")}</div></div>`;
 }
 
-function renderSaturdaySchedule(state, date, season) {
+function renderSaturdaySchedule(state, date, season, now) {
   const slots = [
     { start: "09:00", end: "10:30" },
     { start: "10:30", end: "12:00" },
   ];
-  return `<aside class="schedule-saturday-panel"><div class="schedule-saturday-head"><span>週六上午</span><strong>${shortDate(date)} ${weekdays[5]}</strong></div><div class="schedule-saturday-slots">${slots.map(({ start, end }) => `<section class="schedule-saturday-slot"><div class="schedule-saturday-time">${start}–${end}</div>${renderCell(state, date, start, season)}</section>`).join("")}</div></aside>`;
+  return `<aside class="schedule-saturday-panel"><div class="schedule-saturday-head"><span>週六上午</span><strong>${shortDate(date)} ${weekdays[5]}</strong></div><div class="schedule-saturday-slots">${slots.map(({ start, end }) => `<section class="schedule-saturday-slot"><div class="schedule-saturday-time">${start}–${end}</div>${renderCell(state, date, start, season, now)}</section>`).join("")}</div></aside>`;
 }
 
-export function renderSchedule(state) {
+export function renderSchedule(state, { now = new Date() } = {}) {
   const attendanceDate = getSelectedAttendanceDate();
   if (observedAttendanceDate !== attendanceDate) {
     scheduleWeekStart = getWeekStart(parseDate(attendanceDate));
@@ -104,7 +108,7 @@ export function renderSchedule(state) {
 
   return `<div class="page-head schedule-page-head"><div class="schedule-title-row"><h2>排課</h2>${renderSeasonSwitcher(state, season)}</div><button class="button-secondary schedule-edit-button${deletionMode ? " is-active" : ""}" data-action="toggle-delete-mode" type="button" aria-pressed="${deletionMode}"><span aria-hidden="true">${deletionMode ? "✓" : "✎"}</span> ${deletionMode ? "完成" : "修改排課"}</button></div>
     <div class="week-toolbar"><button class="round-button" data-action="prev-week" type="button" aria-label="上一週"${previousWeekAvailable ? "" : " disabled"}>‹</button><div class="week-title"><strong>${shortDate(weekDates[0])} ${weekdays[0]} — ${shortDate(displayedWeekEnd)} ${displayedWeekEndLabel}</strong><span>${fullDate(weekDates[0])} 至 ${fullDate(displayedWeekEnd)}</span></div><button class="round-button" data-action="next-week" type="button" aria-label="下一週"${nextWeekAvailable ? "" : " disabled"}>›</button><button class="button-secondary" data-action="current-week" type="button">回到本週</button></div>
-    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span data-palette-count>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "按住學生卡片，拖到右側日期與時間格。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-board-layout${showSaturday ? "" : " without-saturday"}">${renderWeekdayScheduleGrid(state, weekdayDates, season)}${showSaturday ? renderSaturdaySchedule(state, weekDates[5], season) : ""}</div></section></div>`;
+    <div class="schedule-editor${paletteCollapsed ? " palette-collapsed" : ""}${deletionMode ? " is-delete-mode" : ""}"><aside class="student-palette"><div class="palette-head"><h3>學生</h3><div class="palette-tools"><span data-palette-count>${filteredStudents.length} / ${activeStudents.length} 位</span><button class="collapse-button" data-action="toggle-palette" type="button">收起</button></div></div><input class="input" id="schedule-search" value="${escapeAttribute(scheduleSearch)}" placeholder="搜尋姓名或年級" /><p class="drag-hint">${deletionMode ? "完成刪除編輯後，即可繼續拖曳新增或移動學生。" : "可拖曳學生卡片，或點擊時段內的加號新增學生。"}</p><div class="palette-groups">${groupedStudents.length ? groupedStudents.map(({ grade, students }) => `<section class="palette-group"><h4>${grade} 年級</h4><div class="palette-list">${students.map(renderPaletteStudent).join("")}</div></section>`).join("") : '<div class="empty">找不到學生。</div>'}</div></aside><section class="panel schedule-board"><div class="collapsed-palette-bar"><button class="button-secondary" data-action="toggle-palette" type="button">展開學生名單</button></div><div class="schedule-board-layout${showSaturday ? "" : " without-saturday"}">${renderWeekdayScheduleGrid(state, weekdayDates, season, now)}${showSaturday ? renderSaturdaySchedule(state, weekDates[5], season, now) : ""}</div></section></div>`;
 }
 
 function renderPaletteStudent(student) {
@@ -160,7 +164,7 @@ function renderScheduledStudent(student, {
   return `<div class="${studentClass}" ${dragAttributes} ${sourceAttributes}><span>${escapeHtml(student.name)}</span>${temporaryLabel}</div>`;
 }
 
-function renderCell(state, date, slot, season) {
+function renderCell(state, date, slot, season, now) {
   const dateKey = formatDate(date);
   if (!seasonContainsDate(season, dateKey)) {
     return `<div class="schedule-cell is-outside-season" aria-disabled="true"><div class="cell-count"><span>—</span></div><div class="cell-students"><span class="student-subtitle">非此時期</span></div></div>`;
@@ -177,7 +181,92 @@ function renderCell(state, date, slot, season) {
   const attendedCount = attendanceRecords.length;
   const isAttendanceDate = dateKey === attendanceDate;
   const cellClass = `schedule-cell${isAttendanceDate ? " is-attendance-date" : ""}${attendedCount ? " has-attendance" : ""}`;
-  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}"${deletionMode ? "" : ` tabindex="0" role="button"`} aria-label="${dateKey} ${slot} 排課格"><div class="cell-count"><span>${students.length} 人</span>${attendedCount ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}</div><div class="cell-students">${students.map((student) => renderScheduledStudent(student, { dateKey, slot, seasonId, isLocked: presentStudentIds.has(student.id), isTemporary: temporaryStudentIds.has(student.id) })).join("") || '<span class="student-subtitle">尚未排課</span>'}</div></div>`;
+  const canAddStudents = !deletionMode
+    && attendedCount === 0
+    && isScheduleSlotUpcoming(dateKey, slot, now);
+  const addButton = canAddStudents
+    ? `<button class="schedule-add-students-button" data-action="add-schedule-students" data-date="${dateKey}" data-slot="${slot}" data-season="${escapeAttribute(seasonId)}" type="button" aria-label="新增 ${dateKey} ${slot} 的排課學生"><span class="schedule-add-students-icon" aria-hidden="true">＋</span><span class="schedule-add-students-label">新增學生</span></button>`
+    : "";
+  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}"${deletionMode ? "" : ` tabindex="0" role="button"`} aria-label="${dateKey} ${slot} 排課格"><div class="cell-count"><span>${students.length} 人</span>${attendedCount ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}</div><div class="cell-students">${students.map((student) => renderScheduledStudent(student, { dateKey, slot, seasonId, isLocked: presentStudentIds.has(student.id), isTemporary: temporaryStudentIds.has(student.id) })).join("") || '<span class="student-subtitle">尚未排課</span>'}${addButton}</div></div>`;
+}
+
+function openScheduleStudentModal(app, state, {
+  dateKey,
+  slot,
+  seasonId,
+}, showToast) {
+  const scheduledStudentIds = new Set(
+    getSchedule(state, dateKey, slot, seasonId)?.studentIds || [],
+  );
+  const availableStudents = state.students
+    .filter((student) => student.status === "active" && !scheduledStudentIds.has(student.id))
+    .sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name, "zh-Hant"));
+  const backdrop = document.createElement("div");
+  backdrop.className = "modal-backdrop";
+  const modal = document.createElement("section");
+  modal.className = "modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-labelledby", "schedule-student-picker-title");
+  modal.innerHTML = `<form class="modal-form" data-schedule-student-form><div class="modal-head"><div><h3 id="schedule-student-picker-title">新增排課學生</h3><p class="student-subtitle">${escapeHtml(`${dateKey}・${slot}`)}，建立一般排課並可沿用到後續週次。</p></div><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="field"><label for="schedule-student-search">搜尋學生</label><input class="input" id="schedule-student-search" type="search" autocomplete="off" placeholder="輸入學生姓名或年級" /></div><div class="checkbox-list schedule-student-picker-list" data-schedule-student-list>${availableStudents.map((student) => `<label class="checkbox-item schedule-student-picker-option" data-search-text="${escapeAttribute(`${student.name}${student.grade}`)}"><input type="checkbox" name="studentIds" value="${escapeAttribute(student.id)}" /><span><strong>${escapeHtml(student.name)}</strong><small>${student.grade} 年級・第 ${student.currentLessonCount} / 24 堂</small></span></label>`).join("")}</div><p class="panel empty schedule-student-picker-empty" data-schedule-student-empty ${availableStudents.length ? "hidden" : ""}>沒有可加入的學生。</p><div class="schedule-student-picker-selection" data-schedule-student-selection>已選取 0 位</div><div class="form-actions"><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit" disabled>加入排課</button></div></form>`;
+  backdrop.append(modal);
+  app.append(backdrop);
+
+  const form = modal.querySelector("[data-schedule-student-form]");
+  const search = modal.querySelector("#schedule-student-search");
+  const options = [...modal.querySelectorAll(".schedule-student-picker-option")];
+  const empty = modal.querySelector("[data-schedule-student-empty]");
+  const selection = modal.querySelector("[data-schedule-student-selection]");
+  const submitButton = form.querySelector('[type="submit"]');
+  const close = () => backdrop.remove();
+  const updateSelection = () => {
+    const selectedCount = form.querySelectorAll('input[name="studentIds"]:checked').length;
+    selection.textContent = `已選取 ${selectedCount} 位`;
+    submitButton.disabled = selectedCount === 0;
+  };
+
+  modal.querySelector("[data-close-modal]").addEventListener("click", close);
+  modal.querySelector("[data-cancel]").addEventListener("click", close);
+  modal.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") close();
+  });
+  backdrop.addEventListener("click", (event) => {
+    if (event.target === backdrop) close();
+  });
+  search.addEventListener("input", (event) => {
+    const query = event.target.value.trim().toLocaleLowerCase();
+    let visibleCount = 0;
+    options.forEach((option) => {
+      const matches = !query
+        || (option.dataset.searchText || "").toLocaleLowerCase().includes(query);
+      option.hidden = !matches;
+      if (matches) visibleCount += 1;
+    });
+    empty.hidden = visibleCount > 0;
+  });
+  form.addEventListener("change", updateSelection);
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const studentIds = [...form.querySelectorAll('input[name="studentIds"]:checked')]
+      .map((input) => input.value);
+    if (!studentIds.length) return;
+    submitButton.disabled = true;
+    try {
+      const addedCount = await addScheduleEntries(studentIds, {
+        dateKey,
+        slot,
+        seasonId,
+      });
+      close();
+      showToast(addedCount
+        ? `已新增 ${addedCount} 位學生到排課`
+        : "選取的學生已在這個時段");
+    } catch (error) {
+      submitButton.disabled = false;
+      showToast(getUserErrorMessage(error, "新增排課學生失敗"));
+    }
+  });
+  search.focus();
 }
 
 export function bindSchedule(app, state, refresh, showToast) {
@@ -260,6 +349,25 @@ export function bindSchedule(app, state, refresh, showToast) {
         button.disabled = false;
         showToast(getUserErrorMessage(error, "無法移除排課"));
       }
+    });
+  });
+  app.querySelectorAll('[data-action="add-schedule-students"]').forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const target = {
+        dateKey: button.dataset.date,
+        slot: button.dataset.slot,
+        seasonId: button.dataset.season,
+      };
+      if (!isScheduleSlotUpcoming(target.dateKey, target.slot)
+        || state.attendance.some((item) => (
+          item.dateKey === target.dateKey && item.slot === target.slot
+        ))) {
+        showToast("這個時段已開始或已有點名紀錄，無法新增學生");
+        refresh();
+        return;
+      }
+      openScheduleStudentModal(app, state, target, showToast);
     });
   });
 

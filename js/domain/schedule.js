@@ -1,5 +1,6 @@
 import { isDateKey, isTimeValue } from "./models.js";
 import {
+  APP_CONFIG,
   SATURDAY_SCHEDULE_SLOTS,
   WEEKDAY_SCHEDULE_SLOTS,
 } from "../config.js";
@@ -30,6 +31,32 @@ export function getScheduleSlotsForWeekday(season, weekday) {
     return SATURDAY_SCHEDULE_SLOTS;
   }
   return [];
+}
+
+function getZonedDateAndTime(date, timeZone) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    dateKey: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+  };
+}
+
+export function isScheduleSlotUpcoming(dateKey, slot, now = new Date()) {
+  if (!isDateKey(dateKey) || !isTimeValue(slot) || Number.isNaN(now?.getTime?.())) {
+    return false;
+  }
+  const current = getZonedDateAndTime(now, APP_CONFIG.timezone);
+  return dateKey > current.dateKey
+    || (dateKey === current.dateKey && slot > current.time);
 }
 
 function encodeIdPart(value) {

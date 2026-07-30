@@ -161,6 +161,11 @@ describe("schedule view", () => {
     expect(html).not.toContain(">19:00<");
     expect(html).not.toContain(">21:00<");
     expect(html).toContain('class="schedule-board-layout without-saturday"');
+    expect(html).toContain('class="schedule-editor palette-collapsed"');
+    expect(html).toContain('class="schedule-desktop-board"');
+    expect(html).toContain('class="schedule-mobile-board"');
+    expect(html.match(/data-action="select-mobile-schedule-date"/g)).toHaveLength(5);
+    expect(html.match(/class="schedule-mobile-slot"/g)).toHaveLength(4);
     expect(html).not.toContain("schedule-saturday-panel");
     expect(html).not.toContain("8/1 週六");
   });
@@ -169,7 +174,7 @@ describe("schedule view", () => {
     const futureHtml = renderSchedule(state, {
       now: new Date("2026-07-20T00:00:00+08:00"),
     });
-    expect(futureHtml.match(/data-action="add-schedule-students"/g)).toHaveLength(20);
+    expect(futureHtml.match(/data-action="add-schedule-students"/g)).toHaveLength(24);
     expect(futureHtml).toContain('data-date="2026-07-27" data-slot="15:00"');
 
     const attendedHtml = renderSchedule({
@@ -186,7 +191,7 @@ describe("schedule view", () => {
     }, {
       now: new Date("2026-07-20T00:00:00+08:00"),
     });
-    expect(attendedHtml.match(/data-action="add-schedule-students"/g)).toHaveLength(19);
+    expect(attendedHtml.match(/data-action="add-schedule-students"/g)).toHaveLength(23);
     expect(attendedHtml).not.toContain('data-action="add-schedule-students" data-date="2026-07-29" data-slot="15:00"');
 
     const pastHtml = renderSchedule(state, {
@@ -245,7 +250,7 @@ describe("schedule view", () => {
     }, vi.fn());
     app.toggleButton.click();
 
-    expect(html).toContain("schedule-editor is-delete-mode");
+    expect(html).toContain("schedule-editor palette-collapsed is-delete-mode");
     expect(html).toContain("完成");
     expect(html).toContain('data-action="remove-schedule-student"');
 

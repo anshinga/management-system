@@ -586,8 +586,16 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .modal-form-grid { grid-template-columns: 1fr; }
   .modal-form-grid .field-wide { grid-column: auto; }
   .checkbox-list { grid-template-columns: 1fr; }
-  .temporary-student-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .temporary-student-option { gap: 6px; padding: 7px; }
+  [data-temporary-student-form] { gap: 10px; }
+  .temporary-student-list {
+    gap: 5px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    margin-bottom: 0;
+    padding-right: 0;
+  }
+  .temporary-student-option { gap: 4px; padding: 6px 5px; }
+  .temporary-student-option strong { font-size: 12px; }
+  .temporary-student-option small { font-size: 10px; }
   .temporary-student-option .temporary-student-lesson { display: none; }
   .week-toolbar { flex-wrap: wrap; }
   .schedule-page-head { align-items: center; flex-direction: row; }

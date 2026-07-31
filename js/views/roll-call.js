@@ -92,6 +92,14 @@ function renderTemporaryStudentCard(slot) {
   return `<button class="student-card temporary-student-card" data-action="add-temporary-students" data-slot="${escapeAttribute(slot)}" type="button"><span class="temporary-student-icon" aria-hidden="true">＋</span><span><strong>新增臨時學生</strong><small>只加入本日，不會立即點名</small></span></button>`;
 }
 
+export function renderTemporaryStudentOption(student) {
+  return `<label class="checkbox-item temporary-student-option" data-search-text="${escapeAttribute(`${student.name}${student.grade}`)}"><input type="checkbox" name="studentIds" value="${escapeAttribute(student.id)}" /><span><strong>${escapeHtml(student.name)}</strong><small>${student.grade} 年級<span class="temporary-student-lesson">・第 ${student.currentLessonCount} / 24 堂</span></small></span></label>`;
+}
+
+export function shouldAutoFocusTemporaryStudentSearch(viewport = globalThis) {
+  return viewport.matchMedia?.("(min-width: 721px)")?.matches === true;
+}
+
 function renderStudent(state, date, slot, id, refresh) {
   const student = getStudent(state, id);
   const record = state.attendance.find((item) => item.studentId === id && item.dateKey === date && item.slot === slot);
@@ -121,7 +129,7 @@ function openTemporaryStudentModal(app, state, {
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("aria-labelledby", "temporary-student-title");
-  modal.innerHTML = `<form class="modal-form" data-temporary-student-form><div class="modal-head"><div><h3 id="temporary-student-title">新增臨時學生</h3><p class="student-subtitle">${escapeHtml(`${dateKey}・${slot}`)}，只新增排課，不會立即點名。</p></div><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="field"><label for="temporary-student-search">搜尋學生</label><input class="input" id="temporary-student-search" type="search" autocomplete="off" placeholder="輸入學生姓名" /></div><div class="checkbox-list temporary-student-list" data-temporary-student-list>${availableStudents.map((student) => `<label class="checkbox-item temporary-student-option" data-search-text="${escapeAttribute(`${student.name}${student.grade}`)}"><input type="checkbox" name="studentIds" value="${escapeAttribute(student.id)}" /><span><strong>${escapeHtml(student.name)}</strong><small>${student.grade} 年級・第 ${student.currentLessonCount} / 24 堂</small></span></label>`).join("")}</div><p class="panel empty temporary-student-empty" data-temporary-student-empty ${availableStudents.length ? "hidden" : ""}>沒有可加入的學生。</p><div class="temporary-student-selection" data-temporary-student-selection>已選取 0 位</div><div class="form-actions"><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit" disabled>加入學生</button></div></form>`;
+  modal.innerHTML = `<form class="modal-form" data-temporary-student-form><div class="modal-head"><div><h3 id="temporary-student-title">新增臨時學生</h3><p class="student-subtitle">${escapeHtml(`${dateKey}・${slot}`)}，只新增排課，不會立即點名。</p></div><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="field"><label for="temporary-student-search">搜尋學生</label><input class="input" id="temporary-student-search" type="search" autocomplete="off" placeholder="輸入學生姓名" /></div><div class="checkbox-list temporary-student-list" data-temporary-student-list>${availableStudents.map(renderTemporaryStudentOption).join("")}</div><p class="panel empty temporary-student-empty" data-temporary-student-empty ${availableStudents.length ? "hidden" : ""}>沒有可加入的學生。</p><div class="temporary-student-selection" data-temporary-student-selection>已選取 0 位</div><div class="form-actions"><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit" disabled>加入學生</button></div></form>`;
   backdrop.append(modal);
   app.append(backdrop);
 
@@ -176,7 +184,7 @@ function openTemporaryStudentModal(app, state, {
       showToast(getUserErrorMessage(error, "臨時學生加入失敗"));
     }
   });
-  search.focus();
+  if (shouldAutoFocusTemporaryStudentSearch()) search.focus();
 }
 
 function openNewAttendanceModal(app, student, dateKey, slot, showToast) {

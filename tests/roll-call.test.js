@@ -11,7 +11,11 @@ vi.mock("../js/repositories/schedule-repository.js", () => ({
   ensureScheduleWeek: vi.fn(() => Promise.resolve(false)),
 }));
 
-const { renderRollCall } = await import("../js/views/roll-call.js");
+const {
+  renderRollCall,
+  renderTemporaryStudentOption,
+  shouldAutoFocusTemporaryStudentSearch,
+} = await import("../js/views/roll-call.js");
 
 const state = {
   students: [],
@@ -40,6 +44,28 @@ function selectAttendanceDate(dateKey) {
 }
 
 describe("roll-call view", () => {
+  test("臨時學生選項將年級與堂數分開以支援手機精簡顯示", () => {
+    const html = renderTemporaryStudentOption({
+      id: "student-1",
+      name: "測試學生",
+      grade: 5,
+      currentLessonCount: 12,
+    });
+
+    expect(html).toContain("測試學生");
+    expect(html).toContain("5 年級");
+    expect(html).toContain('<span class="temporary-student-lesson">・第 12 / 24 堂</span>');
+  });
+
+  test("臨時學生搜尋只在桌面版自動聚焦", () => {
+    expect(shouldAutoFocusTemporaryStudentSearch({
+      matchMedia: () => ({ matches: false }),
+    })).toBe(false);
+    expect(shouldAutoFocusTemporaryStudentSearch({
+      matchMedia: () => ({ matches: true }),
+    })).toBe(true);
+  });
+
   test("四個時段都顯示臨時加入學生的方塊", () => {
     const html = renderRollCall(state);
     expect(html.match(/data-action="add-temporary-students"/g)).toHaveLength(4);

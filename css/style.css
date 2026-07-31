@@ -447,7 +447,8 @@ textarea.input { resize: vertical; }
 .temporary-student-list { max-height: 320px; overflow-y: auto; padding-right: 4px; }
 .temporary-student-option { cursor: pointer; min-width: 0; }
 .temporary-student-option[hidden], .temporary-student-empty[hidden] { display: none; }
-.temporary-student-option span { display: grid; min-width: 0; }
+.temporary-student-option > span { display: grid; min-width: 0; }
+.temporary-student-option strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .temporary-student-option small { color: var(--muted); font-size: 11px; }
 .temporary-student-selection { color: var(--muted); font-size: 13px; }
 .schedule-student-picker-list { max-height: 320px; overflow-y: auto; padding-right: 4px; }
@@ -585,6 +586,9 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .modal-form-grid { grid-template-columns: 1fr; }
   .modal-form-grid .field-wide { grid-column: auto; }
   .checkbox-list { grid-template-columns: 1fr; }
+  .temporary-student-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .temporary-student-option { gap: 6px; padding: 7px; }
+  .temporary-student-option .temporary-student-lesson { display: none; }
   .week-toolbar { flex-wrap: wrap; }
   .schedule-page-head { align-items: center; flex-direction: row; }
   .schedule-title-row { flex: 1; gap: 12px; }

@@ -237,6 +237,41 @@ describe("固定雙月紀錄", () => {
     expect(html).toContain("第 8 堂");
   });
 
+  test("目前與期間紀錄都將停課學生集中在最下方", () => {
+    const activeStudent = {
+      ...students[0],
+      id: "active-high-grade",
+      name: "在讀高年級",
+      grade: 6,
+    };
+    const pausedStudent = {
+      ...students[1],
+      id: "paused-low-grade",
+      name: "停課低年級",
+      grade: 1,
+      status: "paused",
+    };
+    const mixedAttendance = [
+      { studentId: activeStudent.id, dateKey: "2026-05-10", arrivalTime: "15:00", term: 1, lessonNumber: 6 },
+      { studentId: pausedStudent.id, dateKey: "2026-05-10", arrivalTime: "15:00", term: 1, lessonNumber: 6 },
+      { studentId: activeStudent.id, dateKey: "2026-07-27", arrivalTime: "15:00", term: 1, lessonNumber: 8 },
+      { studentId: pausedStudent.id, dateKey: "2026-07-27", arrivalTime: "15:00", term: 1, lessonNumber: 8 },
+    ];
+    const state = {
+      students: [pausedStudent, activeStudent],
+      attendance: mixedAttendance,
+    };
+    const current = renderRecords(state, { todayDate: "2026-07-27" });
+    const period = renderRecords(state, {
+      view: "period",
+      periodKey: "2026-05",
+      todayDate: "2026-07-27",
+    });
+
+    expect(current.indexOf(activeStudent.name)).toBeLessThan(current.indexOf(pausedStudent.name));
+    expect(period.indexOf(activeStudent.name)).toBeLessThan(period.indexOf(pausedStudent.name));
+  });
+
   test("沒有日期也沒有正式紀錄時維持空資料提示", () => {
     expect(renderRecords({
       students: [students[0]],

@@ -21,6 +21,13 @@ function renderRecordItem(item) {
   return `<div class="${classes}"><span class="record-date">${escapeHtml(item.dateKey)}</span><span class="record-lesson">第 ${item.lessonNumber} 堂</span></div>`;
 }
 
+function sortRecordStudents(students) {
+  return [...students].sort((a, b) => {
+    const statusOrder = (a.status === "paused" ? 1 : 0) - (b.status === "paused" ? 1 : 0);
+    return statusOrder || a.grade - b.grade || a.name.localeCompare(b.name);
+  });
+}
+
 function renderStudentRows(students, getHistory, includeEmptyStudents = true) {
   const rows = students
     .map((student) => ({ student, history: getHistory(student) }))
@@ -33,7 +40,7 @@ function renderStudentRows(students, getHistory, includeEmptyStudents = true) {
 
 function renderCurrentRecords(state, todayDate) {
   const period = getBiMonthPeriod(todayDate);
-  const students = [...state.students].sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name));
+  const students = sortRecordStudents(state.students);
   return `<div class="page-head"><div><p class="eyebrow">歷史出席</p><h2>紀錄</h2><p>目前顯示 ${period.label}，並保留每位學生此前最後一筆。</p></div><button class="button-secondary record-folder-button" data-action="open-record-folders" type="button">${renderFolderIcon("is-button")}<span>資料夾</span></button></div>${renderStudentRows(
     students,
     (student) => getCurrentStudentRecords(student, state.attendance, todayDate),
@@ -49,7 +56,7 @@ function renderFolderList(state, todayDate) {
 
 function renderArchivePeriod(state, periodKey) {
   const period = getBiMonthPeriod(`${periodKey}-01`);
-  const students = [...state.students].sort((a, b) => a.grade - b.grade || a.name.localeCompare(b.name));
+  const students = sortRecordStudents(state.students);
   return `<div class="page-head"><div><p class="eyebrow">紀錄資料夾</p><h2>${escapeHtml(period.label)}</h2><p>完整顯示這個雙月區間內的紀錄。</p></div><button class="button-secondary" data-action="open-record-folders" type="button">返回資料夾</button></div>${renderStudentRows(
     students,
     (student) => getStudentRecordsForPeriod(student, state.attendance, periodKey),

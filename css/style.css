@@ -586,7 +586,12 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .modal-form-grid { grid-template-columns: 1fr; }
   .modal-form-grid .field-wide { grid-column: auto; }
   .checkbox-list { grid-template-columns: 1fr; }
-  [data-temporary-student-form] { gap: 10px; }
+  [data-temporary-student-form] {
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  [data-temporary-student-form] > * { min-width: 0; }
+  [data-temporary-student-form] .form-actions { grid-column: 1; }
   .temporary-student-list {
     gap: 5px;
     grid-template-columns: repeat(3, minmax(0, 1fr));

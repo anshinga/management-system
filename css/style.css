@@ -592,6 +592,9 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   }
   [data-temporary-student-form] > * { min-width: 0; }
   [data-temporary-student-form] .form-actions { grid-column: 1; }
+  [data-temporary-student-form] .field label { font-size: 14px; }
+  [data-temporary-student-form] .input { font-size: 16px; }
+  [data-temporary-student-form] .form-actions button { font-size: 16px; }
   .temporary-student-list {
     gap: 5px;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -599,9 +602,10 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
     padding-right: 0;
   }
   .temporary-student-option { gap: 4px; padding: 6px 5px; }
-  .temporary-student-option strong { font-size: 12px; }
-  .temporary-student-option small { font-size: 10px; }
+  .temporary-student-option strong { font-size: 14px; }
+  .temporary-student-option small { font-size: 12px; white-space: nowrap; }
   .temporary-student-option .temporary-student-lesson { display: none; }
+  .temporary-student-selection { font-size: 15px; }
   .week-toolbar { flex-wrap: wrap; }
   .schedule-page-head { align-items: center; flex-direction: row; }
   .schedule-title-row { flex: 1; gap: 12px; }

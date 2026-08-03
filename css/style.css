@@ -425,6 +425,39 @@ textarea.input { resize: vertical; }
 }
 .payment-paid-check:has(input:checked) { background: #e5f2e8; border-color: #b8d4be; color: var(--success); }
 .payment-paid-check:has(input:disabled) { cursor: wait; opacity: .65; }
+.export-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.export-backup-week-toolbar { justify-content: flex-start; }
+.export-backup-week-toolbar .week-title { flex: 0 1 310px; text-align: center; }
+.export-backup-stats .stat { display: grid; }
+.export-backup-notice {
+  background: var(--gold-soft);
+  border: 1px solid var(--gold);
+  border-radius: 9px;
+  color: var(--gold-dark);
+  margin: -8px 0 18px;
+  padding: 10px 13px;
+}
+.export-backup-notice.is-warning { color: var(--warning); }
+.export-backup-preview { padding: 20px; }
+.export-backup-preview .panel-head { align-items: end; margin-bottom: 16px; }
+.export-backup-preview .panel-head p { margin-bottom: 2px; }
+.export-backup-preview .panel-head > span { color: var(--muted); font-size: 12px; }
+.export-backup-day-grid { display: grid; gap: 10px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.export-backup-day { border: 1px solid var(--line); border-radius: 9px; min-width: 0; overflow: hidden; }
+.export-backup-day header {
+  align-items: center;
+  background: var(--surface-alt);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  justify-content: space-between;
+  padding: 9px 11px;
+}
+.export-backup-day header span { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.export-backup-slot { align-items: start; border-bottom: 1px solid var(--line); display: grid; gap: 8px; grid-template-columns: 48px minmax(0, 1fr); padding: 8px 10px; }
+.export-backup-slot:last-child { border-bottom: 0; }
+.export-backup-slot strong { color: var(--gold-dark); font-size: 12px; }
+.export-backup-slot span { font-size: 12px; overflow-wrap: anywhere; }
+.export-backup-no-class { color: var(--muted); font-size: 12px; margin: 0; padding: 18px 10px; text-align: center; }
 .modal-backdrop { align-items: center; background: rgb(0 0 0 / 35%); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 10; }
 .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 90vh; max-width: 520px; overflow: auto; padding: 20px; width: 100%; }
 .modal-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 15px; }
@@ -720,4 +753,13 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .booking-campaign-actions, .booking-invitation-actions { justify-content: flex-start; }
   .payment-list { grid-template-columns: 1fr; }
   .payment-row { align-items: start; flex-direction: column; gap: 12px; }
+  .export-backup-page-head { align-items: stretch; }
+  .export-backup-actions { justify-content: flex-start; }
+  .export-backup-actions button { flex: 1; }
+  .export-backup-week-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .export-backup-week-toolbar .week-title { flex: none; font-size: 13px; width: auto; }
+  .export-backup-week-toolbar [data-action="default-backup-week"] { grid-column: 1 / -1; }
+  .export-backup-day-grid { grid-template-columns: 1fr; }
+  .export-backup-preview { padding: 12px; }
+  .export-backup-preview .panel-head { align-items: start; flex-direction: column; }
 }

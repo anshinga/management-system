@@ -9,6 +9,7 @@
 - Google Authentication 負責登入；實際資料權限由 `workspaces/mpm-main/members` 與 Firestore Security Rules 共同決定。
 - `students`、`seasons`、`scheduleEntries`、`scheduleOverrides`、`attendance`、`billingCycles`、`payments` 分開保存，介面透過 Firestore 即時監聽同步。
 - 完成第 20 堂時會在同一個 transaction 內建立繳費提醒；第 24 堂只推進學生期數。確認已繳費後會解除提醒，不再要求輸入金額、方式或備註。
+- 「匯出備份」會以唯讀方式從排課資料產生下一週紙本點名表，不會建立或修改 Firestore 文件。
 - `localStorage` 只保存深色模式與目前選取的點名日期，不保存業務資料。
 - Firebase 專案為 `denmin-b0a26`，預設工作區為 `mpm-main`。
 
@@ -74,3 +75,13 @@ GitHub Pages 仍照原本流程發布 `index.html`、`booking.html`、`css/` 與
 - 確認後記錄提醒期別與 `paidAt`，並立即解除紅字提醒。
 - 舊有 `payments` 付款歷史保留但不再顯示或新增，避免破壞既有資料。
 - 未來可由 LINE Bot 讀取待處理的 `billingCycles`；目前尚未實作 LINE 串接。
+
+## 匯出備份
+
+- 管理端可手動切換週次，預設顯示下一週。
+- 可下載固定版型的 Word `.docx`，或開啟瀏覽器列印並另存 PDF。
+- 學生姓名右側保留空白註記欄；停課學生不會出現在新備份中。
+- 同一位學生同日排兩堂會保留兩筆；目標週既有的臨時排課也會納入。
+- 平日 15:00、16:30 每時段單頁 8 人，18:00、19:30 每時段單頁 10 人；週六上午依版型分為 8 人與 10 人。超過容量時會在原日期與原時段增加續頁，不會移動或省略學生。
+- Word 範本位於 `assets/templates/mpm-weekly-backup-template.docx`；產生檔案時只填入年份、月份、日期與姓名。
+- 目前只提供手動匯出；每週日自動產生的計畫暫時擱置。

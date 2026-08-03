@@ -1,8 +1,8 @@
 # MPM 點名系統：專案進度與交接
 
-> 最後更新：2026-07-30  
-> 更新時的分支：`main`  
-> 更新前的 Git HEAD：`451c9b9`（學生管理手機介面）
+> 最後更新：2026-08-03
+> 更新時的分支：`main`
+> 更新前的 Git HEAD：`76e8a99`（今日點名拖曳）
 
 這份文件提供給後續的新對話或開發者快速接手。開始修改前，仍必須先完整閱讀 `AGENTS.md`，並以使用者最新指示為準。
 
@@ -23,11 +23,10 @@
 
 ## 目前檢查點
 
-- 本文件建立前，Git 工作目錄沒有未提交變更。
-- 一般測試最近一次結果：`14` 個測試檔、`77` 項測試全部通過。
+- 目前有「匯出備份」功能的未提交變更。
+- 一般測試最近一次結果：`18` 個測試檔、`98` 項測試全部通過。
 - 最近一次瀏覽器載入檢查沒有 Console 錯誤。
-- 受保護的管理頁需要 Google 登入；若測試環境沒有登入狀態，介面內容主要由 render/domain 測試驗證。
-- 本文件建立後會成為新的未提交檔案，除非之後另行 commit。
+- Word 備份已實際產生兩頁溢出範例，並以 Microsoft Word 渲染確認版面與續頁。
 
 ## 專案用途與技術架構
 
@@ -38,6 +37,7 @@
 - 每週排課
 - 點名紀錄
 - 繳費管理
+- 匯出紙本備份
 - 家長／學生選課活動
 
 技術架構：
@@ -68,6 +68,7 @@
 - `js/domain/models.js`：欄位正規化與基本格式驗證。
 - `js/domain/attendance.js`：點名與期數／堂數相關規則。
 - `js/domain/schedule.js`：排課 ID、沿用、分組與時期營業時段規則。
+- `js/domain/export-backup.js`：唯讀推導指定週排課、學生排序、版型容量與續頁。
 - `js/domain/records.js`：紀錄期間與舊資料起點。
 - `js/domain/booking.js`：選課活動輸入、時段鍵值與驗證。
 
@@ -91,6 +92,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 - `js/views/schedule.js`：排課頁。
 - `js/views/records.js`：歷史紀錄與資料夾。
 - `js/views/payment.js`：繳費頁。
+- `js/views/export-backup.js`：手動 Word／列印備份頁。
 - `js/views/booking-campaigns.js`：管理端選課活動。
 - `js/booking-app.js`：公開選課頁。
 
@@ -248,6 +250,17 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 - 刪除最新的第 20 堂點名時，若提醒仍未繳費，會在同一 transaction 撤回提醒。
 - 未來可由 LINE Bot 讀取待繳提醒；目前不包含 LINE 串接。
 
+### 匯出備份
+
+- 與今日點名、排課、學生等功能同層，預設選取下一週，也可手動切換週次。
+- 只讀取 `students`、`seasons`、`scheduleEntries` 與 `scheduleOverrides`，不寫入 Firestore，也不需要新增 Rules。
+- 可下載固定版型 Word `.docx`，或使用瀏覽器列印／另存 PDF。
+- 停課學生排除；同一學生同日多堂會逐堂保留；目標週臨時排課會納入但不會向後沿用。
+- 姓名右側保留空白註記欄。平日 15:00、16:30 每時段單頁 8 人，18:00、19:30 每時段單頁 10 人；週六兩時段分別 8 人與 10 人。
+- 超過容量時複製完整表格成續頁，只放原日期、原時段的溢出學生，不會移到其他時段或省略。
+- Word 範本保存在 `assets/templates/mpm-weekly-backup-template.docx`；`js/documents/backup-docx.js` 只修改範本內的標題、日期與姓名欄，`js/documents/backup-print.js` 建立列印版。
+- 目前僅手動匯出；週日下午自動化計畫已擱置。
+
 ### 家長／學生選課活動
 
 - 管理端可建立活動，設定：
@@ -276,6 +289,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 6. 排課、今日點名與選課活動必須使用一致的營業時段。
 7. Firestore 資料結構或全面遷移必須先取得使用者確認。
 8. 不可用前端 email 比對或按鈕隱藏取代真正的 Security Rules。
+9. 匯出備份必須保持唯讀，不可為了產生文件而補寫或改動排課資料。
 
 ## 響應式介面狀態
 
@@ -285,6 +299,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
   - 今日點名
   - 學生管理
   - 排課（手機單日模式；桌面仍為週模式）
+- 匯出備份已驗證桌面三欄預覽與手機單欄預覽，不會產生水平溢位。
 - 其他頁面的手機版仍以既有共用樣式為主。若後續要重新設計，應逐頁與使用者確認，且不要影響桌面版。
 
 ## 測試與驗證

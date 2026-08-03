@@ -66,6 +66,7 @@ async function startManagementSystem(user) {
       import("./views/schedule.js"),
       import("./views/records.js"),
       import("./views/payment.js"),
+      import("./views/export-backup.js"),
       import("./views/booking-campaigns.js"),
       import("./repositories/workspace-data-repository.js"),
       import("./repositories/workspace-repository.js"),
@@ -76,6 +77,7 @@ async function startManagementSystem(user) {
       { renderSchedule, bindSchedule },
       { renderRecords, bindRecords },
       { renderPayment, bindPayment },
+      { renderExportBackup, bindExportBackup },
       { renderBookingCampaigns, bindBookingCampaigns },
       { subscribeToWorkspaceData },
       { ensureWorkspaceAccess, promoteStudentGradesIfNeeded },
@@ -126,18 +128,21 @@ async function startManagementSystem(user) {
                 ? renderRecords(state)
                 : currentRoute === "payment"
                   ? renderPayment(state)
-                  : renderBookingCampaigns(state);
+                  : currentRoute === "export-backup"
+                    ? renderExportBackup(state)
+                    : renderBookingCampaigns(state);
         if (currentRoute === "roll-call") bindRollCall(app, state, refresh, showToast);
         if (currentRoute === "students") bindStudents(app, state, refresh, showToast);
         if (currentRoute === "schedule") bindSchedule(app, state, refresh, showToast);
         if (currentRoute === "records") bindRecords(app, state);
         if (currentRoute === "payment") bindPayment(app, state, refresh, showToast);
+        if (currentRoute === "export-backup") bindExportBackup(app, state, refresh, showToast);
         if (currentRoute === "booking") bindBookingCampaigns(app, state, refresh, showToast);
         app.querySelector('[data-action="refresh"]')?.addEventListener("click", () => refresh(true));
       }
 
       initRouter((route) => {
-        currentRoute = ["roll-call", "students", "schedule", "records", "payment", "booking"].includes(route)
+        currentRoute = ["roll-call", "students", "schedule", "records", "payment", "export-backup", "booking"].includes(route)
           ? route
           : "roll-call";
         refresh(true);

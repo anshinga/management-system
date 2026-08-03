@@ -144,6 +144,47 @@ describe("schedule domain", () => {
     }]);
   });
 
+  test("單日覆寫會隱藏原時段，但保留移入時段的臨時排課", () => {
+    const originalEntry = {
+      studentId: "s1",
+      seasonId: "summer",
+      dateKey: "2026-07-27",
+      slot: "15:00",
+    };
+    const movedEntry = {
+      studentId: "s1",
+      seasonId: "summer",
+      dateKey: "2026-07-27",
+      slot: "16:30",
+      temporary: true,
+    };
+    const overrides = [{
+      studentId: "s1",
+      seasonId: "summer",
+      weekStart: "2026-07-27",
+      sourceWeekday: 1,
+      sourceSlot: "15:00",
+    }];
+
+    expect(groupScheduleEntries([originalEntry, movedEntry], overrides)).toEqual([{
+      id: "summer-2026-07-27-16:30",
+      season: "summer",
+      date: "2026-07-27",
+      slot: "16:30",
+      studentIds: ["s1"],
+      temporaryStudentIds: ["s1"],
+    }]);
+    expect(buildCarryForwardEntries({
+      previousEntries: [originalEntry, movedEntry],
+      seasonId: "summer",
+    })).toEqual([{
+      studentId: "s1",
+      seasonId: "summer",
+      dateKey: "2026-08-03",
+      slot: "15:00",
+    }]);
+  });
+
   test("錯誤日期或時間不會產生文件 ID", () => {
     expect(() => makeScheduleEntryId({
       dateKey: "2026-02-30",

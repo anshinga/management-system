@@ -23,6 +23,7 @@ import {
 import {
   addTemporaryScheduleEntries,
   ensureScheduleWeek,
+  moveScheduleEntryForDate,
 } from "../repositories/schedule-repository.js";
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
@@ -79,13 +80,24 @@ export function renderRollCall(state, refresh) {
     </div>
     <div class="class-list">
       ${todaySchedules.length
-        ? todaySchedules.map(({ slot, schedule }) => renderClass(state, date, slot, schedule, refresh)).join("")
+        ? todaySchedules.map(({ slot, schedule }) => renderClass(
+            state,
+            date,
+            slot,
+            schedule,
+            season?.id,
+          )).join("")
         : '<div class="panel empty"><strong>今日未營業</strong><p>這個日期沒有開放上課時段。</p></div>'}
     </div>`;
 }
 
-function renderClass(state, date, slot, schedule, refresh) {
-  return `<section class="class-section"><div class="class-heading"><h3>${slot}</h3><span>${schedule.studentIds.length} 人</span></div><div class="class-students">${schedule.studentIds.map((id) => renderStudent(state, date, slot, id, refresh)).join("")}${renderTemporaryStudentCard(slot)}</div></section>`;
+function renderClass(state, date, slot, schedule, seasonId) {
+  const temporaryStudentIds = new Set(schedule.temporaryStudentIds || []);
+  const resolvedSeasonId = seasonId || schedule.season || "";
+  return `<section class="class-section"><div class="class-heading"><h3>${slot}</h3><span>${schedule.studentIds.length} 人</span></div><div class="class-students roll-call-drop-zone" data-roll-call-drop-slot="${escapeAttribute(slot)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-season="${escapeAttribute(resolvedSeasonId)}">${schedule.studentIds.map((id) => renderStudent(state, date, slot, id, {
+    seasonId: resolvedSeasonId,
+    isTemporary: temporaryStudentIds.has(id),
+  })).join("")}${renderTemporaryStudentCard(slot)}</div></section>`;
 }
 
 function renderTemporaryStudentCard(slot) {
@@ -100,13 +112,15 @@ export function shouldAutoFocusTemporaryStudentSearch(viewport = globalThis) {
   return viewport.matchMedia?.("(min-width: 721px)")?.matches === true;
 }
 
-function renderStudent(state, date, slot, id, refresh) {
+function renderStudent(state, date, slot, id, { seasonId, isTemporary }) {
   const student = getStudent(state, id);
   const record = state.attendance.find((item) => item.studentId === id && item.dateKey === date && item.slot === slot);
   if (!student) return "";
   const displayedLessonNumber = record?.lessonNumber ?? student.currentLessonCount;
   const paymentReminder = needsPaymentReminder(student, state.billingCycles);
-  return `<article class="student-card roll-call-student-card ${record ? "is-present" : ""}"><div class="student-summary"><div><div class="student-name-row"><div class="student-name${paymentReminder ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${displayedLessonNumber} 堂</div><div class="roll-call-mobile-meta">${displayedLessonNumber} / ${record ? escapeHtml(record.arrivalTime) : "未到"}</div></div></div><div class="attendance-actions">${record ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>` : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}">到班</button>`}</div></article>`;
+  const moveAttributes = record ? "" : ` draggable="true" data-roll-call-student="${escapeAttribute(id)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-slot="${escapeAttribute(slot)}" data-roll-call-season="${escapeAttribute(seasonId)}" data-roll-call-temporary="${isTemporary}"`;
+  const dragHandle = record ? "" : `<button class="roll-call-drag-handle" data-action="drag-roll-call-student" type="button" aria-label="拖曳 ${escapeAttribute(student.name)} 調整今日時段" title="拖曳調整今日時段"><span aria-hidden="true">⋮⋮</span></button>`;
+  return `<article class="student-card roll-call-student-card${record ? " is-present" : " is-draggable"}"${moveAttributes}><div class="student-summary"><div><div class="student-name-row"><div class="student-name${paymentReminder ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${displayedLessonNumber} 堂</div><div class="roll-call-mobile-meta">${displayedLessonNumber} / ${record ? escapeHtml(record.arrivalTime) : "未到"}</div></div></div><div class="attendance-actions">${record ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>` : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}">到班</button>`}</div>${dragHandle}</article>`;
 }
 
 function closeAttendanceModal(backdrop) {
@@ -268,6 +282,130 @@ function openAttendanceModal(app, state, record, showToast) {
   });
 }
 
+function bindRollCallScheduleDrag(app, state, showToast) {
+  const cards = [...app.querySelectorAll("[data-roll-call-student]")];
+  const dropZones = [...app.querySelectorAll("[data-roll-call-drop-slot]")];
+  let desktopDrag = null;
+  let touchDrag = null;
+
+  const getDragData = (card) => ({
+    card,
+    studentId: card.dataset.rollCallStudent,
+    source: {
+      dateKey: card.dataset.rollCallDate,
+      slot: card.dataset.rollCallSlot,
+      seasonId: card.dataset.rollCallSeason,
+      ...(card.dataset.rollCallTemporary === "true" ? { temporary: true } : {}),
+    },
+  });
+  const clearDropTargets = () => {
+    dropZones.forEach((zone) => zone.classList.remove("is-roll-call-drop-target"));
+  };
+  const moveToZone = async (data, zone) => {
+    if (!data || !zone || data.source.slot === zone.dataset.rollCallDropSlot) return;
+    const target = {
+      dateKey: zone.dataset.rollCallDate,
+      slot: zone.dataset.rollCallDropSlot,
+      seasonId: zone.dataset.rollCallSeason,
+    };
+    const targetSchedule = getSchedule(state, target.dateKey, target.slot, target.seasonId);
+    if (targetSchedule?.studentIds.includes(data.studentId)) {
+      showToast("這位學生已經在目標時段內");
+      return;
+    }
+    if (state.attendance.some((item) => (
+      item.studentId === data.studentId
+      && item.dateKey === data.source.dateKey
+      && item.slot === data.source.slot
+    ))) {
+      showToast("這位學生已完成點名，不能移動時段");
+      return;
+    }
+
+    data.card.classList.add("is-moving");
+    data.card.setAttribute("aria-busy", "true");
+    try {
+      await moveScheduleEntryForDate(data.studentId, data.source, target);
+      const studentName = getStudent(state, data.studentId)?.name || "學生";
+      showToast(`已將 ${studentName} 移到 ${target.slot}，只調整本日`);
+    } catch (error) {
+      data.card.classList.remove("is-moving");
+      data.card.removeAttribute("aria-busy");
+      showToast(getUserErrorMessage(error, "今日時段調整失敗"));
+    }
+  };
+
+  cards.forEach((card) => {
+    card.addEventListener("dragstart", (event) => {
+      if (event.target.closest("button")) {
+        event.preventDefault();
+        return;
+      }
+      desktopDrag = getDragData(card);
+      card.classList.add("is-dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", card.dataset.rollCallStudent);
+    });
+    card.addEventListener("dragend", () => {
+      desktopDrag = null;
+      card.classList.remove("is-dragging");
+      clearDropTargets();
+    });
+  });
+
+  dropZones.forEach((zone) => {
+    zone.addEventListener("dragover", (event) => {
+      if (!desktopDrag) return;
+      event.preventDefault();
+      zone.classList.add("is-roll-call-drop-target");
+    });
+    zone.addEventListener("dragleave", () => zone.classList.remove("is-roll-call-drop-target"));
+    zone.addEventListener("drop", (event) => {
+      event.preventDefault();
+      zone.classList.remove("is-roll-call-drop-target");
+      const data = desktopDrag;
+      desktopDrag = null;
+      return moveToZone(data, zone);
+    });
+  });
+
+  const finishTouchDrag = (event, cancelled = false) => {
+    if (!touchDrag) return;
+    const zone = cancelled
+      ? null
+      : document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-roll-call-drop-slot]");
+    touchDrag.card.classList.remove("is-dragging");
+    document.removeEventListener("pointermove", moveTouchDrag);
+    document.removeEventListener("pointerup", finishTouchDrag);
+    document.removeEventListener("pointercancel", cancelTouchDrag);
+    clearDropTargets();
+    const data = touchDrag;
+    touchDrag = null;
+    if (zone) moveToZone(data, zone);
+  };
+  const cancelTouchDrag = (event) => finishTouchDrag(event, true);
+  function moveTouchDrag(event) {
+    if (!touchDrag) return;
+    event.preventDefault();
+    const zone = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-roll-call-drop-slot]");
+    dropZones.forEach((item) => item.classList.toggle("is-roll-call-drop-target", item === zone));
+  }
+
+  app.querySelectorAll('[data-action="drag-roll-call-student"]').forEach((handle) => {
+    handle.addEventListener("pointerdown", (event) => {
+      if (event.pointerType === "mouse") return;
+      event.preventDefault();
+      const card = handle.closest("[data-roll-call-student]");
+      if (!card) return;
+      touchDrag = getDragData(card);
+      card.classList.add("is-dragging");
+      document.addEventListener("pointermove", moveTouchDrag, { passive: false });
+      document.addEventListener("pointerup", finishTouchDrag);
+      document.addEventListener("pointercancel", cancelTouchDrag);
+    });
+  });
+}
+
 export function bindRollCall(app, state, refresh, showToast) {
   const selectedDate = getSelectedAttendanceDate();
   const selectedSeason = getSeasonForDate(state, selectedDate);
@@ -309,4 +447,5 @@ export function bindRollCall(app, state, refresh, showToast) {
       }, showToast);
     });
   });
+  bindRollCallScheduleDrag(app, state, showToast);
 }

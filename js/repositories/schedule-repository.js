@@ -12,6 +12,7 @@ import {
   makeScheduleEntryId,
   makeScheduleOverrideId,
 } from "../domain/schedule.js";
+import { makeAttendanceId } from "../domain/attendance.js";
 import { db } from "../firebase/firestore.js";
 import { COLLECTIONS, workspaceCollectionRef, workspaceDocumentRef } from "./firestore-paths.js";
 
@@ -31,6 +32,10 @@ function overrideData({ dateKey, seasonId, studentId, slot }) {
 
 function overrideReference(value) {
   return workspaceDocumentRef(COLLECTIONS.scheduleOverrides, makeScheduleOverrideId(overrideData(value)));
+}
+
+function attendanceReference(value) {
+  return workspaceDocumentRef(COLLECTIONS.attendance, makeAttendanceId(value));
 }
 
 function entryData({ studentId, seasonId, dateKey, slot, temporary = false }) {
@@ -217,6 +222,89 @@ export async function removeScheduleEntry(studentId, source) {
       updatedAt: serverTimestamp(),
     });
   });
+}
+
+export async function moveScheduleEntryForDate(studentId, source, target) {
+  if (!studentId || !source?.dateKey || !source?.slot || !source?.seasonId
+    || !target?.dateKey || !target?.slot || !target?.seasonId) {
+    throw new Error("缺少單日排課移動所需資料。");
+  }
+  if (source.dateKey !== target.dateKey || source.seasonId !== target.seasonId) {
+    throw new Error("單日排課只能移到同一天、同一時期的時段。");
+  }
+  if (source.slot === target.slot) return false;
+
+  const sourceData = entryData({ studentId, ...source });
+  const targetData = entryData({ studentId, ...target, temporary: true });
+  const sourceRef = entryReference(sourceData);
+  const targetRef = entryReference(targetData);
+  const sourceOverrideRef = sourceData.temporary === true
+    ? null
+    : overrideReference(sourceData);
+  const targetOverrideRef = sourceData.temporary === true
+    ? overrideReference(targetData)
+    : null;
+  const sourceAttendanceRef = attendanceReference(sourceData);
+  const targetAttendanceRef = attendanceReference(targetData);
+  const references = [...new Map([
+    sourceRef,
+    targetRef,
+    sourceOverrideRef,
+    targetOverrideRef,
+    sourceAttendanceRef,
+    targetAttendanceRef,
+  ]
+    .filter(Boolean)
+    .map((reference) => [reference.path, reference])).values()];
+
+  await runTransaction(db, async (transaction) => {
+    const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
+    const snapshotByPath = new Map(snapshots.map((snapshot) => [snapshot.ref.path, snapshot]));
+    const sourceSnapshot = snapshotByPath.get(sourceRef.path);
+    const targetSnapshot = snapshotByPath.get(targetRef.path);
+    const targetOverrideSnapshot = targetOverrideRef
+      ? snapshotByPath.get(targetOverrideRef.path)
+      : null;
+    const restoresOverriddenTarget = sourceData.temporary === true
+      && targetSnapshot?.exists()
+      && targetSnapshot.data().temporary !== true
+      && targetOverrideSnapshot?.exists();
+
+    if (!sourceSnapshot?.exists()) throw new Error("原本的排課已不存在，請重新整理後再試。");
+    if (snapshotByPath.get(sourceAttendanceRef.path)?.exists()) {
+      throw new Error("這位學生已完成點名，不能移動時段。");
+    }
+    if (snapshotByPath.get(targetAttendanceRef.path)?.exists()) {
+      throw new Error("這位學生在目標時段已有點名紀錄。");
+    }
+    if (targetSnapshot?.exists() && !restoresOverriddenTarget) {
+      throw new Error("這位學生已經在目標時段內。");
+    }
+
+    if (sourceData.temporary === true) transaction.delete(sourceRef);
+    if (restoresOverriddenTarget) {
+      transaction.delete(targetOverrideRef);
+      return;
+    }
+    transaction.set(targetRef, {
+      ...targetData,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+    if (!sourceOverrideRef) return;
+    const overrideSnapshot = snapshotByPath.get(sourceOverrideRef.path);
+    if (overrideSnapshot?.exists()) {
+      transaction.update(sourceOverrideRef, { updatedAt: serverTimestamp() });
+      return;
+    }
+    transaction.set(sourceOverrideRef, {
+      ...overrideData(sourceData),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+  return true;
 }
 
 async function addScheduleEntriesByType(studentIds, target, temporary) {

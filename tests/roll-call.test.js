@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest";
 
+const moveScheduleEntryForDateMock = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+
 vi.mock("../js/repositories/attendance-repository.js", () => ({
   markAttendance: vi.fn(),
   removeLatestAttendance: vi.fn(),
@@ -9,9 +11,11 @@ vi.mock("../js/repositories/attendance-repository.js", () => ({
 vi.mock("../js/repositories/schedule-repository.js", () => ({
   addTemporaryScheduleEntries: vi.fn(),
   ensureScheduleWeek: vi.fn(() => Promise.resolve(false)),
+  moveScheduleEntryForDate: moveScheduleEntryForDateMock,
 }));
 
 const {
+  bindRollCall,
   renderRollCall,
   renderTemporaryStudentOption,
   shouldAutoFocusTemporaryStudentSearch,
@@ -37,7 +41,37 @@ beforeEach(() => {
     getItem: (key) => values.get(key) || null,
     setItem: (key, value) => values.set(key, String(value)),
   });
+  moveScheduleEntryForDateMock.mockClear();
 });
+
+class FakeDragElement {
+  constructor(dataset = {}) {
+    this.dataset = dataset;
+    this.listeners = {};
+    this.attributes = new Map();
+    this.classes = new Set();
+    this.classList = {
+      add: (...names) => names.forEach((name) => this.classes.add(name)),
+      remove: (...names) => names.forEach((name) => this.classes.delete(name)),
+      toggle: (name, force) => {
+        if (force) this.classes.add(name);
+        else this.classes.delete(name);
+      },
+    };
+  }
+
+  addEventListener(type, listener) {
+    this.listeners[type] = listener;
+  }
+
+  setAttribute(name, value) {
+    this.attributes.set(name, value);
+  }
+
+  removeAttribute(name) {
+    this.attributes.delete(name);
+  }
+}
 
 function selectAttendanceDate(dateKey) {
   localStorage.setItem("mpm-selected-attendance-date", dateKey);
@@ -142,6 +176,113 @@ describe("roll-call view", () => {
     expect(html).not.toContain("第 2 期");
     expect(html).not.toContain("期待付款");
     expect(html).not.toContain("pending-badge");
+  });
+
+  test("未點名學生可拖曳調整本日時段，已點名學生保持鎖定", () => {
+    const baseStudent = {
+      id: "student-1",
+      name: "允涵",
+      grade: 7,
+      status: "active",
+      currentLessonCount: 12,
+      currentTerm: 1,
+    };
+    const schedule = {
+      id: "summer-2026-2026-07-27-15:00",
+      season: "summer-2026",
+      date: "2026-07-27",
+      slot: "15:00",
+      studentIds: ["student-1"],
+      temporaryStudentIds: ["student-1"],
+    };
+    const pendingHtml = renderRollCall({
+      ...state,
+      students: [baseStudent],
+      schedules: [schedule],
+    });
+
+    expect(pendingHtml).toContain('class="student-card roll-call-student-card is-draggable" draggable="true"');
+    expect(pendingHtml).toContain('data-roll-call-student="student-1"');
+    expect(pendingHtml).toContain('data-roll-call-temporary="true"');
+    expect(pendingHtml).toContain('data-action="drag-roll-call-student"');
+    expect(pendingHtml.match(/data-roll-call-drop-slot=/g)).toHaveLength(4);
+
+    const attendedHtml = renderRollCall({
+      ...state,
+      students: [baseStudent],
+      schedules: [schedule],
+      attendance: [{
+        id: "2026-07-27__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+        arrivalTime: "15:02",
+        lessonNumber: 12,
+      }],
+    });
+
+    expect(attendedHtml).toContain('class="student-card roll-call-student-card is-present"');
+    expect(attendedHtml).not.toContain('data-roll-call-student="student-1"');
+    expect(attendedHtml).not.toContain('data-action="drag-roll-call-student"');
+  });
+
+  test("桌面拖放會呼叫只影響當日的排課移動", async () => {
+    const card = new FakeDragElement({
+      rollCallStudent: "student-1",
+      rollCallDate: "2026-07-27",
+      rollCallSlot: "15:00",
+      rollCallSeason: "summer-2026",
+      rollCallTemporary: "false",
+    });
+    const sourceZone = new FakeDragElement({
+      rollCallDate: "2026-07-27",
+      rollCallDropSlot: "15:00",
+      rollCallSeason: "summer-2026",
+    });
+    const targetZone = new FakeDragElement({
+      rollCallDate: "2026-07-27",
+      rollCallDropSlot: "16:30",
+      rollCallSeason: "summer-2026",
+    });
+    const app = {
+      querySelector: () => null,
+      querySelectorAll: (selector) => {
+        if (selector === "[data-roll-call-student]") return [card];
+        if (selector === "[data-roll-call-drop-slot]") return [sourceZone, targetZone];
+        return [];
+      },
+    };
+    const showToast = vi.fn();
+    bindRollCall(app, {
+      ...state,
+      students: [{ id: "student-1", name: "允涵", status: "active" }],
+      schedules: state.schedules,
+    }, vi.fn(), showToast);
+
+    card.listeners.dragstart({
+      target: { closest: () => null },
+      preventDefault: vi.fn(),
+      dataTransfer: {
+        effectAllowed: "",
+        setData: vi.fn(),
+      },
+    });
+    await targetZone.listeners.drop({ preventDefault: vi.fn() });
+
+    expect(moveScheduleEntryForDateMock).toHaveBeenCalledWith(
+      "student-1",
+      {
+        dateKey: "2026-07-27",
+        slot: "15:00",
+        seasonId: "summer-2026",
+      },
+      {
+        dateKey: "2026-07-27",
+        slot: "16:30",
+        seasonId: "summer-2026",
+      },
+    );
+    expect(showToast).toHaveBeenCalledWith("已將 允涵 移到 16:30，只調整本日");
   });
 
   test("舊資料完成第 20 堂但尚無提醒文件時，姓名仍會顯示紅色", () => {

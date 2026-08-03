@@ -45,7 +45,7 @@ export function subscribeToWorkspaceData(onState, onError, { includeBooking = fa
       seasons: data.seasons,
       scheduleEntries: data.scheduleEntries,
       scheduleOverrides: data.scheduleOverrides,
-      schedules: groupScheduleEntries(data.scheduleEntries),
+      schedules: groupScheduleEntries(data.scheduleEntries, data.scheduleOverrides),
       attendance: data.attendance,
       billingCycles: data.billingCycles,
       payments: data.payments,

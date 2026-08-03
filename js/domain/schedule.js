@@ -145,10 +145,29 @@ export function buildCarryForwardEntries({
     .map(({ sourcePattern, ...entry }) => entry);
 }
 
-export function groupScheduleEntries(entries = []) {
+export function groupScheduleEntries(entries = [], overrides = []) {
+  const overriddenEntries = new Set(overrides.map((override) => (
+    [
+      override.seasonId,
+      override.weekStart,
+      override.studentId,
+      override.sourceWeekday,
+      override.sourceSlot,
+    ].join("\u0000")
+  )));
   const cells = new Map();
   entries.forEach((entry) => {
     if (!entry?.dateKey || !entry?.slot || !entry?.seasonId || !entry?.studentId) return;
+    const weekday = parseDateKey(entry.dateKey).getDay() || 7;
+    const weekStart = shiftDateKey(entry.dateKey, 1 - weekday);
+    const overrideKey = [
+      entry.seasonId,
+      weekStart,
+      entry.studentId,
+      weekday,
+      entry.slot,
+    ].join("\u0000");
+    if (entry.temporary !== true && overriddenEntries.has(overrideKey)) return;
     const key = `${entry.seasonId}\u0000${entry.dateKey}\u0000${entry.slot}`;
     if (!cells.has(key)) {
       cells.set(key, {

@@ -134,10 +134,16 @@ textarea.input { resize: vertical; }
 .class-heading h3 { margin: 0; }
 .class-heading span { color: var(--muted); font-size: 13px; }
 .class-students { display: grid; gap: 8px; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 10px; }
+.roll-call-drop-zone { transition: background .15s ease, box-shadow .15s ease; }
+.roll-call-drop-zone.is-roll-call-drop-target { background: var(--gold-soft); box-shadow: inset 0 0 0 2px var(--gold); }
 .student-card { align-items: center; display: flex; gap: 12px; justify-content: space-between; min-width: 0; padding: 12px 14px; }
 .roll-call-student-card { gap: 8px; padding: 10px 12px; }
+.roll-call-student-card.is-draggable { cursor: grab; }
+.roll-call-student-card.is-dragging { cursor: grabbing; opacity: .5; }
+.roll-call-student-card.is-moving { opacity: .55; pointer-events: none; }
 .roll-call-student-card .student-summary { flex: 1 1 auto; }
 .roll-call-student-card .attendance-actions { flex: 0 0 auto; gap: 6px; }
+.roll-call-drag-handle { display: none; }
 .student-card.is-present { background: #f2f8f2; border-color: #b8d4be; }
 .temporary-student-card { background: transparent; border-style: dashed; color: var(--muted); cursor: pointer; justify-content: flex-start; text-align: left; }
 .temporary-student-card:hover { background: var(--surface-alt); border-color: var(--gold); color: var(--gold-dark); }
@@ -497,7 +503,7 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
     align-items: center;
     display: grid;
     gap: 5px;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     min-height: 54px;
     padding: 7px 8px;
   }
@@ -510,6 +516,21 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .roll-call-mobile-meta { color: var(--muted); font-size: 11px; white-space: nowrap; }
   .roll-call-student-card .student-name { font-size: 14px; line-height: 1.2; }
   .roll-call-student-card .attendance-actions { align-self: center; justify-content: flex-end; }
+  .roll-call-drag-handle {
+    align-items: center;
+    align-self: stretch;
+    background: transparent;
+    border: 0;
+    color: var(--muted);
+    cursor: grab;
+    display: inline-flex;
+    font-size: 16px;
+    justify-content: center;
+    min-width: 20px;
+    padding: 0 2px;
+    touch-action: none;
+  }
+  .roll-call-drag-handle:active { color: var(--gold-dark); cursor: grabbing; }
   .roll-call-student-card .button-edit-attendance,
   .roll-call-student-card .button-attend {
     font-size: 11px;

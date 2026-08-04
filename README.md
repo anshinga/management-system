@@ -9,7 +9,7 @@
 - GitHub Pages 直接讀取專案根目錄的 `index.html`、`css/` 與 `js/`，不需要 Vite 或 production build。
 - `index.html` 透過 Firebase 官方 CDN import map 載入 Firebase Web SDK。
 - Google Authentication 負責登入；實際資料權限由 `workspaces/mpm-main/members` 與 Firestore Security Rules 共同決定。
-- `students`、`seasons`、`scheduleEntries`、`scheduleOverrides`、`attendance`、`billingCycles`、`payments` 分開保存，介面透過 Firestore 即時監聽同步。
+- `students`、`seasons`、`scheduleEntries`、`scheduleOverrides`、`attendance`、`leaveRecords`、`billingCycles`、`payments` 分開保存，介面透過 Firestore 即時監聽同步。
 - 完成第 20 堂時會在同一個 transaction 內建立繳費提醒；第 24 堂只推進學生期數。確認已繳費後會解除提醒，不再要求輸入金額、方式或備註。
 - 「匯出備份」會以唯讀方式從排課資料產生下一週紙本點名表，不會建立或修改 Firestore 文件。
 - `localStorage` 只保存深色模式與目前選取的點名日期，不保存業務資料。
@@ -77,6 +77,14 @@ GitHub Pages 仍照原本流程發布 `index.html`、`booking.html`、`css/` 與
 - 確認後記錄提醒期別與 `paidAt`，並立即解除紅字提醒。
 - 舊有 `payments` 付款歷史保留但不再顯示或新增，避免破壞既有資料。
 - 未來可由 LINE Bot 讀取待處理的 `billingCycles`；目前尚未實作 LINE 串接。
+
+## 請假
+
+- 今日點名的未到班學生可選擇「到班」或「請假」，請假後可再取消。
+- 請假以獨立的 `leaveRecords` 文件保存，不建立 `attendance`，因此不增加堂數、不推進期數，也不觸發繳費提醒。
+- 同一學生同一天不同時段分開判斷；請假中的時段會鎖定，必須先取消請假才能拖曳或改為到班。
+- 排課頁會以刪除線姓名、虛線框與「請假」標籤呈現，但排課格不會因此變成已到班的綠色狀態。
+- 發布包含此功能的 GitHub Pages 版本前，必須先發布相容的 `firestore.rules`，否則新集合無法讀取。
 
 ## 匯出備份
 

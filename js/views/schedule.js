@@ -170,27 +170,30 @@ function renderScheduledStudent(student, {
   slot,
   seasonId,
   isLocked,
+  isOnLeave,
   isTemporary,
 }) {
-  const studentClass = `drag-student schedule-student${isLocked ? " is-present is-locked" : ""}${deletionMode && !isLocked ? " is-delete-candidate" : ""}`;
+  const isResolved = isLocked || isOnLeave;
+  const studentClass = `drag-student schedule-student${isLocked ? " is-present is-locked" : ""}${isOnLeave ? " is-on-leave is-locked" : ""}${deletionMode && !isResolved ? " is-delete-candidate" : ""}`;
   const sourceAttributes = `data-drag-student="${escapeAttribute(student.id)}" data-drag-source="schedule" data-source-date="${dateKey}" data-source-slot="${slot}" data-source-season="${escapeAttribute(seasonId)}" data-source-temporary="${isTemporary}"`;
   const temporaryLabel = isTemporary ? "<small>臨時</small>" : "";
+  const leaveLabel = isOnLeave ? '<small class="schedule-leave-label">請假</small>' : "";
 
   if (deletionMode) {
-    const lockedAttributes = isLocked
-      ? 'aria-disabled="true" title="已有點名紀錄，無法移除排課"'
+    const lockedAttributes = isResolved
+      ? `aria-disabled="true" title="${isOnLeave ? "已請假，請先在今日點名取消請假" : "已有點名紀錄，無法移除排課"}"`
       : `title="${isTemporary ? "移除這筆臨時排課" : "從本週起移除這位學生"}"`;
     const removeLabel = isTemporary
       ? `移除 ${escapeAttribute(student.name)} 的臨時排課`
       : `從 ${dateKey} ${slot} 起移除 ${escapeAttribute(student.name)}`;
-    const removeButton = isLocked ? "" : `<button class="schedule-remove-button" data-action="remove-schedule-student" data-student-id="${escapeAttribute(student.id)}" data-student-name="${escapeAttribute(student.name)}" data-date="${dateKey}" data-slot="${slot}" data-season="${escapeAttribute(seasonId)}" data-temporary="${isTemporary}" type="button" aria-label="${removeLabel}">×</button>`;
-    return `<div class="${studentClass}" ${lockedAttributes} ${sourceAttributes}><span>${escapeHtml(student.name)}</span>${temporaryLabel}${removeButton}</div>`;
+    const removeButton = isResolved ? "" : `<button class="schedule-remove-button" data-action="remove-schedule-student" data-student-id="${escapeAttribute(student.id)}" data-student-name="${escapeAttribute(student.name)}" data-date="${dateKey}" data-slot="${slot}" data-season="${escapeAttribute(seasonId)}" data-temporary="${isTemporary}" type="button" aria-label="${removeLabel}">×</button>`;
+    return `<div class="${studentClass}" ${lockedAttributes} ${sourceAttributes}><span>${escapeHtml(student.name)}</span>${temporaryLabel}${leaveLabel}${removeButton}</div>`;
   }
 
-  const dragAttributes = isLocked
-    ? 'aria-disabled="true" title="已簽到，無法調整排課"'
+  const dragAttributes = isResolved
+    ? `aria-disabled="true" title="${isOnLeave ? "已請假，請先在今日點名取消請假" : "已簽到，無法調整排課"}"`
     : `draggable="true" tabindex="0" role="button" aria-label="選取 ${escapeAttribute(student.name)} 以調整排課" title="拖曳或按 Enter 調整時間"`;
-  return `<div class="${studentClass}" ${dragAttributes} ${sourceAttributes}><span>${escapeHtml(student.name)}</span>${temporaryLabel}</div>`;
+  return `<div class="${studentClass}" ${dragAttributes} ${sourceAttributes}><span>${escapeHtml(student.name)}</span>${temporaryLabel}${leaveLabel}</div>`;
 }
 
 function renderCell(state, date, slot, season, now) {
@@ -205,9 +208,17 @@ function renderCell(state, date, slot, season, now) {
     .map((id) => getStudent(state, id))
     .filter((student) => student?.status === "active") || [];
   const temporaryStudentIds = new Set(schedule?.temporaryStudentIds || []);
+  const displayedStudentIds = new Set(students.map((student) => student.id));
   const attendanceRecords = state.attendance.filter((item) => item.dateKey === dateKey && item.slot === slot);
   const presentStudentIds = new Set(attendanceRecords.map((item) => item.studentId));
+  const leaveRecords = (state.leaveRecords || []).filter((item) => (
+    item.dateKey === dateKey
+    && item.slot === slot
+    && displayedStudentIds.has(item.studentId)
+  ));
+  const leaveStudentIds = new Set(leaveRecords.map((item) => item.studentId));
   const attendedCount = attendanceRecords.length;
+  const leaveCount = leaveRecords.length;
   const isAttendanceDate = dateKey === attendanceDate;
   const cellClass = `schedule-cell${isAttendanceDate ? " is-attendance-date" : ""}${attendedCount ? " has-attendance" : ""}`;
   const canAddStudents = !deletionMode
@@ -216,7 +227,7 @@ function renderCell(state, date, slot, season, now) {
   const addButton = canAddStudents
     ? `<button class="schedule-add-students-button" data-action="add-schedule-students" data-date="${dateKey}" data-slot="${slot}" data-season="${escapeAttribute(seasonId)}" type="button" aria-label="新增 ${dateKey} ${slot} 的排課學生"><span class="schedule-add-students-icon" aria-hidden="true">＋</span><span class="schedule-add-students-label">新增學生</span></button>`
     : "";
-  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}"${deletionMode ? "" : ` tabindex="0" role="button"`} aria-label="${dateKey} ${slot} 排課格"><div class="cell-count"><span>${students.length} 人</span>${attendedCount ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}</div><div class="cell-students">${students.map((student) => renderScheduledStudent(student, { dateKey, slot, seasonId, isLocked: presentStudentIds.has(student.id), isTemporary: temporaryStudentIds.has(student.id) })).join("") || '<span class="student-subtitle">尚未排課</span>'}${addButton}</div></div>`;
+  return `<div class="${cellClass}" data-date="${dateKey}" data-slot="${slot}" data-season="${seasonId}"${deletionMode ? "" : ` tabindex="0" role="button"`} aria-label="${dateKey} ${slot} 排課格"><div class="cell-count"><span>${students.length} 人</span><span class="cell-status-counts">${attendedCount ? `<span class="cell-attendance-count">已到 ${attendedCount}</span>` : ""}${leaveCount ? `<span class="cell-leave-count">請假 ${leaveCount}</span>` : ""}</span></div><div class="cell-students">${students.map((student) => renderScheduledStudent(student, { dateKey, slot, seasonId, isLocked: presentStudentIds.has(student.id), isOnLeave: leaveStudentIds.has(student.id), isTemporary: temporaryStudentIds.has(student.id) })).join("") || '<span class="student-subtitle">尚未排課</span>'}${addButton}</div></div>`;
 }
 
 function openScheduleStudentModal(app, state, {

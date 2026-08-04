@@ -21,6 +21,10 @@ import {
   updateAttendanceTime,
 } from "../repositories/attendance-repository.js";
 import {
+  cancelStudentLeave,
+  markStudentLeave,
+} from "../repositories/leave-repository.js";
+import {
   addTemporaryScheduleEntries,
   ensureScheduleWeek,
   moveScheduleEntryForDate,
@@ -61,6 +65,13 @@ export function renderRollCall(state, refresh) {
   const present = state.attendance.filter((item) => (
     item.dateKey === date && activeStudentIds.has(item.studentId)
   )).length;
+  const leaveCount = (state.leaveRecords || []).filter((item) => (
+    item.dateKey === date
+    && activeStudentIds.has(item.studentId)
+    && todaySchedules.some(({ slot, schedule }) => (
+      slot === item.slot && schedule.studentIds.includes(item.studentId)
+    ))
+  )).length;
   const pending = getPaymentReminderItems(state.students, state.billingCycles).length;
   const scheduledPersonCount = todaySchedules.reduce((
     count,
@@ -75,7 +86,7 @@ export function renderRollCall(state, refresh) {
     </div>
     <div class="stat-grid">
       <div class="stat"><div class="stat-label">當日課程人次</div><div class="stat-value">${scheduledPersonCount}</div><div class="stat-note">依選定日期排課</div></div>
-      <div class="stat"><div class="stat-label">當日已到班</div><div class="stat-value">${present}</div><div class="stat-note">含其他時段紀錄</div></div>
+      <div class="stat"><div class="stat-label">當日已到班</div><div class="stat-value">${present}</div><div class="stat-note">請假 ${leaveCount} 人次</div></div>
       <div class="stat"><div class="stat-label">待繳費</div><div class="stat-value">${pending}</div><div class="stat-note">仍可正常點名</div></div>
     </div>
     <div class="class-list">
@@ -115,12 +126,23 @@ export function shouldAutoFocusTemporaryStudentSearch(viewport = globalThis) {
 function renderStudent(state, date, slot, id, { seasonId, isTemporary }) {
   const student = getStudent(state, id);
   const record = state.attendance.find((item) => item.studentId === id && item.dateKey === date && item.slot === slot);
+  const leaveRecord = (state.leaveRecords || []).find((item) => (
+    item.studentId === id && item.dateKey === date && item.slot === slot
+  ));
   if (!student) return "";
   const displayedLessonNumber = record?.lessonNumber ?? student.currentLessonCount;
   const paymentReminder = needsPaymentReminder(student, state.billingCycles);
-  const moveAttributes = record ? "" : ` draggable="true" data-roll-call-student="${escapeAttribute(id)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-slot="${escapeAttribute(slot)}" data-roll-call-season="${escapeAttribute(seasonId)}" data-roll-call-temporary="${isTemporary}"`;
-  const dragHandle = record ? "" : `<button class="roll-call-drag-handle" data-action="drag-roll-call-student" type="button" aria-label="拖曳 ${escapeAttribute(student.name)} 調整今日時段" title="拖曳調整今日時段"><span aria-hidden="true">⋮⋮</span></button>`;
-  return `<article class="student-card roll-call-student-card${record ? " is-present" : " is-draggable"}"${moveAttributes}><div class="student-summary"><div><div class="student-name-row"><div class="student-name${paymentReminder ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${displayedLessonNumber} 堂</div><div class="roll-call-mobile-meta">${displayedLessonNumber} / ${record ? escapeHtml(record.arrivalTime) : "未到"}</div></div></div><div class="attendance-actions">${record ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>` : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}">到班</button>`}</div>${dragHandle}</article>`;
+  const isResolved = Boolean(record || leaveRecord);
+  const moveAttributes = isResolved ? "" : ` draggable="true" data-roll-call-student="${escapeAttribute(id)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-slot="${escapeAttribute(slot)}" data-roll-call-season="${escapeAttribute(seasonId)}" data-roll-call-temporary="${isTemporary}"`;
+  const dragHandle = isResolved ? "" : `<button class="roll-call-drag-handle" data-action="drag-roll-call-student" type="button" aria-label="拖曳 ${escapeAttribute(student.name)} 調整今日時段" title="拖曳調整今日時段"><span aria-hidden="true">⋮⋮</span></button>`;
+  const cardStatusClass = record ? " is-present" : leaveRecord ? " is-on-leave" : " is-draggable";
+  const statusText = record ? escapeHtml(record.arrivalTime) : leaveRecord ? "請假" : "未到";
+  const actions = record
+    ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>`
+    : leaveRecord
+      ? `<span class="leave-status">請假</span><button class="button-secondary button-cancel-leave" data-action="cancel-leave" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}" type="button">取消請假</button>`
+      : `<button class="button-attend" data-action="attend" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}" type="button">到班</button><button class="button-leave" data-action="leave" data-student-id="${escapeAttribute(id)}" data-slot="${escapeAttribute(slot)}" type="button">請假</button>`;
+  return `<article class="student-card roll-call-student-card${cardStatusClass}"${moveAttributes}><div class="student-summary"><div><div class="student-name-row"><div class="student-name${paymentReminder ? " is-payment-pending" : ""}">${escapeHtml(student.name)}</div><span class="grade-badge">${student.grade} 年級</span></div><div class="student-subtitle">第 ${displayedLessonNumber} 堂</div><div class="roll-call-mobile-meta">${displayedLessonNumber} / ${statusText}</div></div></div><div class="attendance-actions">${actions}</div>${dragHandle}</article>`;
 }
 
 function closeAttendanceModal(backdrop) {
@@ -321,6 +343,14 @@ function bindRollCallScheduleDrag(app, state, showToast) {
       showToast("這位學生已完成點名，不能移動時段");
       return;
     }
+    if ((state.leaveRecords || []).some((item) => (
+      item.studentId === data.studentId
+      && item.dateKey === data.source.dateKey
+      && item.slot === data.source.slot
+    ))) {
+      showToast("這位學生已登記請假，請先取消請假");
+      return;
+    }
 
     data.card.classList.add("is-moving");
     data.card.setAttribute("aria-busy", "true");
@@ -429,6 +459,34 @@ export function bindRollCall(app, state, refresh, showToast) {
     if (!student) return;
     const date = getSelectedAttendanceDate();
     openNewAttendanceModal(app, student, date, button.dataset.slot, showToast);
+  }));
+  app.querySelectorAll('[data-action="leave"]').forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      await markStudentLeave({
+        studentId: button.dataset.studentId,
+        dateKey: selectedDate,
+        slot: button.dataset.slot,
+      });
+      showToast("已登記請假，不會增加堂數");
+    } catch (error) {
+      button.disabled = false;
+      showToast(getUserErrorMessage(error, "請假登記失敗"));
+    }
+  }));
+  app.querySelectorAll('[data-action="cancel-leave"]').forEach((button) => button.addEventListener("click", async () => {
+    button.disabled = true;
+    try {
+      await cancelStudentLeave({
+        studentId: button.dataset.studentId,
+        dateKey: selectedDate,
+        slot: button.dataset.slot,
+      });
+      showToast("已取消請假");
+    } catch (error) {
+      button.disabled = false;
+      showToast(getUserErrorMessage(error, "取消請假失敗"));
+    }
   }));
   app.querySelectorAll('[data-action="edit-attendance"]').forEach((button) => button.addEventListener("click", () => {
     const record = state.attendance.find((item) => item.id === button.dataset.attendanceId);

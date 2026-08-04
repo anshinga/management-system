@@ -24,6 +24,14 @@ service cloud.firestore {
       return /databases/$(database)/documents/workspaces/$(workspaceId)/students/$(studentId);
     }
 
+    function attendancePath(workspaceId, attendanceId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/attendance/$(attendanceId);
+    }
+
+    function leaveRecordPath(workspaceId, leaveRecordId) {
+      return /databases/$(database)/documents/workspaces/$(workspaceId)/leaveRecords/$(leaveRecordId);
+    }
+
     function billingCyclePath(workspaceId, billingCycleId) {
       return /databases/$(database)/documents/workspaces/$(workspaceId)/billingCycles/$(billingCycleId);
     }
@@ -391,6 +399,16 @@ service cloud.firestore {
         && data.recordedBy.size() > 0;
     }
 
+    function validLeaveRecord(data) {
+      return data.keys().hasAll(["studentId", "dateKey", "slot", "recordedBy", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "dateKey", "slot", "recordedBy", "createdAt", "updatedAt"])
+        && isSafeDocumentId(data.studentId)
+        && isDateKey(data.dateKey)
+        && isTimeValue(data.slot)
+        && data.recordedBy is string
+        && data.recordedBy.size() > 0;
+    }
+
     function validBillingCycle(data) {
       return data.keys().hasAll(["studentId", "term", "status", "paymentId", "paidAt", "createdAt", "updatedAt"])
         && data.keys().hasOnly(["studentId", "term", "status", "paymentId", "reminderAt", "completedAt", "paidAt", "createdAt", "updatedAt"])
@@ -535,6 +553,19 @@ service cloud.firestore {
         allow delete: if canTeach(workspaceId);
       }
 
+      match /leaveRecords/{leaveRecordId} {
+        allow read: if canRead(workspaceId);
+        allow create: if canTeach(workspaceId)
+          && leaveRecordId == expectedAttendanceId(request.resource.data)
+          && validLeaveRecord(request.resource.data)
+          && hasCreateTimestamps(request.resource.data)
+          && request.resource.data.recordedBy == request.auth.uid
+          && exists(studentPath(workspaceId, request.resource.data.studentId))
+          && !existsAfter(attendancePath(workspaceId, leaveRecordId));
+        allow update: if false;
+        allow delete: if canTeach(workspaceId);
+      }
+
       match /attendance/{attendanceId} {
         allow read: if canRead(workspaceId);
         allow create: if canTeach(workspaceId)
@@ -543,6 +574,7 @@ service cloud.firestore {
           && hasCreateTimestamps(request.resource.data)
           && request.resource.data.recordedBy == request.auth.uid
           && exists(studentPath(workspaceId, request.resource.data.studentId))
+          && !existsAfter(leaveRecordPath(workspaceId, attendanceId))
           && request.resource.data.term
             == get(studentPath(workspaceId, request.resource.data.studentId)).data.currentTerm
           && request.resource.data.lessonNumber

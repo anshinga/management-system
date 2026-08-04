@@ -8,6 +8,7 @@ const CORE_COLLECTIONS = [
   COLLECTIONS.scheduleEntries,
   COLLECTIONS.scheduleOverrides,
   COLLECTIONS.attendance,
+  COLLECTIONS.leaveRecords,
   COLLECTIONS.billingCycles,
   COLLECTIONS.payments,
 ];
@@ -47,6 +48,7 @@ export function subscribeToWorkspaceData(onState, onError, { includeBooking = fa
       scheduleOverrides: data.scheduleOverrides,
       schedules: groupScheduleEntries(data.scheduleEntries, data.scheduleOverrides),
       attendance: data.attendance,
+      leaveRecords: data.leaveRecords,
       billingCycles: data.billingCycles,
       payments: data.payments,
       bookingCampaigns: data.bookingCampaigns || [],

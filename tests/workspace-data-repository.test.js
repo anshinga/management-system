@@ -16,6 +16,7 @@ vi.mock("../js/repositories/firestore-paths.js", () => ({
     scheduleEntries: "scheduleEntries",
     scheduleOverrides: "scheduleOverrides",
     attendance: "attendance",
+    leaveRecords: "leaveRecords",
     billingCycles: "billingCycles",
     payments: "payments",
     bookingCampaigns: "bookingCampaigns",
@@ -58,6 +59,7 @@ describe("workspace data repository", () => {
       "scheduleEntries",
       "scheduleOverrides",
       "attendance",
+      "leaveRecords",
       "billingCycles",
       "payments",
     ].forEach((name) => snapshotHandlers.get(name).next(emptySnapshot()));
@@ -79,6 +81,7 @@ describe("workspace data repository", () => {
       errorCode: "permission-denied",
     });
     expect(state.students).toEqual([]);
+    expect(state.leaveRecords).toEqual([]);
     expect(state.bookingCampaigns).toEqual([]);
   });
 });

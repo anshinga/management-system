@@ -8,6 +8,11 @@ vi.mock("../js/repositories/attendance-repository.js", () => ({
   updateAttendanceTime: vi.fn(),
 }));
 
+vi.mock("../js/repositories/leave-repository.js", () => ({
+  cancelStudentLeave: vi.fn(),
+  markStudentLeave: vi.fn(),
+}));
+
 vi.mock("../js/repositories/schedule-repository.js", () => ({
   addTemporaryScheduleEntries: vi.fn(),
   ensureScheduleWeek: vi.fn(() => Promise.resolve(false)),
@@ -32,6 +37,7 @@ const state = {
   }],
   schedules: [],
   attendance: [],
+  leaveRecords: [],
   billingCycles: [],
 };
 
@@ -224,6 +230,84 @@ describe("roll-call view", () => {
     expect(attendedHtml).toContain('class="student-card roll-call-student-card is-present"');
     expect(attendedHtml).not.toContain('data-roll-call-student="student-1"');
     expect(attendedHtml).not.toContain('data-action="drag-roll-call-student"');
+  });
+
+  test("請假不增加堂數，卡片顯示刪除線狀態並可取消請假", () => {
+    const leaveState = {
+      ...state,
+      students: [{
+        id: "student-1",
+        name: "允涵",
+        grade: 7,
+        status: "active",
+        currentLessonCount: 12,
+        currentTerm: 1,
+      }],
+      schedules: [{
+        id: "summer-2026-2026-07-27-15:00",
+        season: "summer-2026",
+        date: "2026-07-27",
+        slot: "15:00",
+        studentIds: ["student-1"],
+      }],
+      leaveRecords: [{
+        id: "2026-07-27__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+      }],
+    };
+    const html = renderRollCall(leaveState);
+
+    expect(html).toContain('class="student-card roll-call-student-card is-on-leave"');
+    expect(html).toContain('<div class="student-name">允涵</div>');
+    expect(html).toContain('<div class="student-subtitle">第 12 堂</div>');
+    expect(html).toContain('<div class="roll-call-mobile-meta">12 / 請假</div>');
+    expect(html).toContain('<span class="leave-status">請假</span>');
+    expect(html).toContain('data-action="cancel-leave"');
+    expect(html).toContain('<div class="stat-note">請假 1 人次</div>');
+    expect(html).not.toContain('data-roll-call-student="student-1"');
+    expect(html).not.toContain('data-action="attend" data-student-id="student-1"');
+  });
+
+  test("同一學生同一天兩堂課可分別請假與到班", () => {
+    const html = renderRollCall({
+      ...state,
+      students: [{
+        id: "student-1",
+        name: "允涵",
+        grade: 7,
+        status: "active",
+        currentLessonCount: 12,
+        currentTerm: 1,
+      }],
+      schedules: [
+        {
+          id: "summer-2026-2026-07-27-15:00",
+          season: "summer-2026",
+          date: "2026-07-27",
+          slot: "15:00",
+          studentIds: ["student-1"],
+        },
+        {
+          id: "summer-2026-2026-07-27-16:30",
+          season: "summer-2026",
+          date: "2026-07-27",
+          slot: "16:30",
+          studentIds: ["student-1"],
+        },
+      ],
+      leaveRecords: [{
+        id: "2026-07-27__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+      }],
+    });
+
+    expect(html.match(/roll-call-student-card is-on-leave/g)).toHaveLength(1);
+    expect(html.match(/data-action="attend" data-student-id="student-1"/g)).toHaveLength(1);
+    expect(html.match(/data-action="leave" data-student-id="student-1"/g)).toHaveLength(1);
   });
 
   test("桌面拖放會呼叫只影響當日的排課移動", async () => {

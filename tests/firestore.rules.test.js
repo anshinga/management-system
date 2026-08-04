@@ -6,6 +6,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import {
   collection,
+  deleteDoc,
   doc,
   getDoc,
   runTransaction,
@@ -374,6 +375,65 @@ describe("Firestore Security Rules", () => {
         updatedAt: serverTimestamp(),
       });
     }));
+  });
+
+  test("teacher 可以登記與取消請假，且同時不能存在到班紀錄", async () => {
+    const database = testEnvironment.authenticatedContext("teacher-uid", {
+      email: "teacher@example.com",
+      email_verified: true,
+    }).firestore();
+    const student = workspaceDocument(database, "students", "student-1");
+    const leaveRecord = workspaceDocument(database, "leaveRecords", "2026-07-27__16%3A30__student-1");
+    const attendance = workspaceDocument(database, "attendance", "2026-07-27__16%3A30__student-1");
+    const leaveData = {
+      studentId: "student-1",
+      dateKey: "2026-07-27",
+      slot: "16:30",
+      recordedBy: "teacher-uid",
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+
+    await assertSucceeds(setDoc(leaveRecord, leaveData));
+    await assertFails(runTransaction(database, async (transaction) => {
+      const studentSnapshot = await transaction.get(student);
+      transaction.set(attendance, {
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "16:30",
+        arrivalTime: "16:28",
+        lessonNumber: 4,
+        term: 1,
+        recordedBy: "teacher-uid",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      transaction.update(student, {
+        currentLessonCount: studentSnapshot.data().currentLessonCount + 1,
+        updatedAt: serverTimestamp(),
+      });
+    }));
+
+    await assertSucceeds(deleteDoc(leaveRecord));
+    await assertSucceeds(runTransaction(database, async (transaction) => {
+      const studentSnapshot = await transaction.get(student);
+      transaction.set(attendance, {
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "16:30",
+        arrivalTime: "16:28",
+        lessonNumber: 4,
+        term: 1,
+        recordedBy: "teacher-uid",
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      transaction.update(student, {
+        currentLessonCount: studentSnapshot.data().currentLessonCount + 1,
+        updatedAt: serverTimestamp(),
+      });
+    }));
+    await assertFails(setDoc(leaveRecord, leaveData));
   });
 
   test("第 24 堂只推進下一期並保留既有提醒狀態", async () => {

@@ -85,6 +85,7 @@ const state = {
     },
   ],
   attendance: [],
+  leaveRecords: [],
 };
 
 const allSeasonState = {
@@ -219,6 +220,28 @@ describe("schedule view", () => {
     expect(html).toContain("已到 1");
     expect(html).toContain("schedule-student is-present is-locked");
     expect(html).toContain('aria-disabled="true" title="已簽到，無法調整排課"');
+  });
+
+  test("請假學生顯示刪除線虛線狀態，但排課格不會視為已到班", () => {
+    const html = renderSchedule({
+      ...state,
+      leaveRecords: [{
+        id: "2026-07-29__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-29",
+        slot: "15:00",
+      }],
+    }, {
+      now: new Date("2026-07-20T00:00:00+08:00"),
+    });
+
+    expect(html).toContain("schedule-student is-on-leave is-locked");
+    expect(html).toContain('<small class="schedule-leave-label">請假</small>');
+    expect(html).toContain("請假 1");
+    expect(html).toContain('aria-disabled="true" title="已請假，請先在今日點名取消請假"');
+    expect(html).not.toContain('class="schedule-cell has-attendance" data-date="2026-07-29"');
+    expect(html).not.toContain("已到 1");
+    expect(html.match(/data-action="add-schedule-students"/g)).toHaveLength(24);
   });
 
   test("停課學生不會出現在排課名單或排課格", () => {

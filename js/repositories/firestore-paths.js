@@ -9,6 +9,7 @@ export const COLLECTIONS = Object.freeze({
   scheduleEntries: "scheduleEntries",
   scheduleOverrides: "scheduleOverrides",
   attendance: "attendance",
+  leaveRecords: "leaveRecords",
   billingCycles: "billingCycles",
   payments: "payments",
   bookingCampaigns: "bookingCampaigns",

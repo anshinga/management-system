@@ -134,6 +134,8 @@ textarea.input { resize: vertical; }
 .roll-call-student-card .attendance-actions { flex: 0 0 auto; gap: 6px; }
 .roll-call-drag-handle { display: none; }
 .student-card.is-present { background: #f2f8f2; border-color: #b8d4be; }
+.student-card.is-on-leave { background: var(--surface-alt); border-style: dashed; }
+.student-card.is-on-leave .student-name { text-decoration: line-through; text-decoration-thickness: 1.5px; }
 .temporary-student-card { background: transparent; border-style: dashed; color: var(--muted); cursor: pointer; justify-content: flex-start; text-align: left; }
 .temporary-student-card:hover { background: var(--surface-alt); border-color: var(--gold); color: var(--gold-dark); }
 .temporary-student-card small { display: block; font-size: 11px; font-weight: 400; margin-top: 2px; }
@@ -161,7 +163,11 @@ textarea.input { resize: vertical; }
 .attendance-actions { flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .button-edit-attendance { padding: 8px 11px; }
 .attendance-time { color: var(--success); font-size: 13px; white-space: nowrap; }
+.leave-status { color: var(--warning); font-size: 13px; font-weight: 600; white-space: nowrap; }
 .button-attend { background: var(--text); border: 1px solid var(--text); border-radius: 7px; color: white; min-width: 70px; padding: 8px 11px; }
+.button-leave { background: transparent; border: 1px dashed var(--warning); border-radius: 7px; color: var(--warning); min-width: 58px; padding: 8px 11px; }
+.button-leave:hover { background: var(--surface-alt); }
+.button-cancel-leave { padding: 8px 11px; }
 .is-present .button-attend { background: transparent; border-color: #9fc0a5; color: var(--success); }
 .empty { color: var(--muted); padding: 28px; text-align: center; }
 .panel { padding: 18px; }
@@ -258,7 +264,9 @@ textarea.input { resize: vertical; }
   white-space: nowrap;
 }
 .cell-count { align-items: center; color: var(--muted); display: flex; font-size: 12px; gap: 6px; justify-content: space-between; margin-bottom: 8px; }
+.cell-status-counts { align-items: center; display: flex; gap: 5px; }
 .cell-attendance-count { color: var(--success); font-weight: 600; white-space: nowrap; }
+.cell-leave-count { color: var(--warning); font-weight: 600; white-space: nowrap; }
 .schedule-board .schedule-cell.is-attendance-date { background: var(--surface-alt); }
 .schedule-board .schedule-cell.has-attendance { border-color: var(--success); }
 .schedule-board .schedule-day.is-outside-season { opacity: .4; }
@@ -278,6 +286,9 @@ textarea.input { resize: vertical; }
 .round-button:disabled { cursor: not-allowed; opacity: .35; }
 .schedule-student { background: var(--gold-soft); border-color: transparent; color: var(--gold-dark); min-width: 0; overflow-wrap: anywhere; padding: 6px 7px; touch-action: none; }
 .schedule-student.is-present { background: #e5f2e8; border-color: #b8d4be; color: var(--success); }
+.schedule-student.is-on-leave { background: var(--surface-alt); border-color: var(--warning); border-style: dashed; color: var(--muted); }
+.schedule-student.is-on-leave > span { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+.schedule-student .schedule-leave-label { color: var(--warning); font-weight: 600; }
 .schedule-student.is-locked { cursor: not-allowed; opacity: .82; }
 .schedule-student:hover { border-color: var(--gold); }
 .schedule-student span { min-width: 0; }
@@ -541,6 +552,7 @@ textarea.input { resize: vertical; }
 body.dark { --bg: #1d1e1b; --surface: #282925; --surface-alt: #22231f; --text: #f2f1e9; --muted: #a8a99e; --line: #464740; --gold-soft: #4c401d; --success: #8fc29a; --warning: #e1a56f; }
 body.dark .student-card.is-present { background: #283b2d; border-color: #53755b; }
 body.dark .schedule-student.is-present { background: #283b2d; border-color: #53755b; color: var(--success); }
+body.dark .student-card.is-on-leave, body.dark .schedule-student.is-on-leave { background: #302d26; }
 body.dark .student-status-select.active { background-color: #283b2d; border-color: #53755b; }
 body.dark .student-status-select.paused { background-color: #3a3b36; border-color: #55564f; }
 @media (max-width: 1050px) {
@@ -585,6 +597,7 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .roll-call-student-card .student-name-row .grade-badge,
   .roll-call-student-card .student-subtitle,
   .roll-call-student-card .attendance-time,
+  .roll-call-student-card .leave-status,
   .roll-call-desktop-label { display: none; }
   .roll-call-mobile-meta, .roll-call-mobile-label { display: inline; }
   .roll-call-mobile-meta { color: var(--muted); font-size: 11px; white-space: nowrap; }
@@ -606,7 +619,9 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   }
   .roll-call-drag-handle:active { color: var(--gold-dark); cursor: grabbing; }
   .roll-call-student-card .button-edit-attendance,
-  .roll-call-student-card .button-attend {
+  .roll-call-student-card .button-attend,
+  .roll-call-student-card .button-leave,
+  .roll-call-student-card .button-cancel-leave {
     font-size: 11px;
     min-width: 0;
     padding: 5px 7px;

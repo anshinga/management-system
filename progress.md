@@ -2,7 +2,7 @@
 
 > 最後更新：2026-08-04
 > 更新時的分支：`main`
-> 更新前的 Git HEAD：`f38b64c`（匯出格式更改）
+> 更新前的 Git HEAD：`86b384e`（加入品牌圖案）
 
 這份文件提供給後續的新對話或開發者快速接手。開始修改前，仍必須先完整閱讀 `AGENTS.md`，並以使用者最新指示為準。
 
@@ -23,8 +23,8 @@
 
 ## 目前檢查點
 
-- 目前有網站品牌更新的未提交變更：登入頁、主系統與家長選課頁改用安信佳標誌，瀏覽器 favicon 與 iOS 主畫面圖示改用大嘴鳥。
-- 一般測試最近一次結果：`20` 個測試檔、`119` 項測試全部通過。
+- 目前有請假功能的未提交變更：使用獨立 `leaveRecords`，不影響堂數、期數、繳費提醒與正式點名紀錄。
+- 一般測試最近一次結果：`21` 個測試檔、`126` 項測試全部通過。
 - 最近一次瀏覽器載入檢查沒有 Console 錯誤。
 - Word 備份已實際產生同日後續時段補位範例，並以 Microsoft Word 渲染確認維持單一 A4 橫式頁；真正超過整日容量的情況仍有續頁測試。
 - 課程紀錄 Word 已以 60 位學生、16 堂續列與六字長姓名實際產生並逐頁檢查；輸出維持 A4 橫式 3 頁，沒有截斷或額外空白頁。
@@ -79,6 +79,7 @@
 - `js/repositories/students-repository.js`
 - `js/repositories/schedule-repository.js`
 - `js/repositories/attendance-repository.js`
+- `js/repositories/leave-repository.js`
 - `js/repositories/payments-repository.js`
 - `js/repositories/booking-repository.js`
 - `js/repositories/workspace-data-repository.js`
@@ -112,6 +113,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 - `scheduleEntries`：逐日期、時段、學生的排課文件。
 - `scheduleOverrides`：每週排課沿用的例外。
 - `attendance`：不可任意覆寫的點名紀錄。
+- `leaveRecords`：按日期、時段與學生保存的請假紀錄，不計入堂數。
 - `billingCycles`：待付款或已結清期別。
 - `payments`：付款歷史。
 - `bookingCampaigns`：選課活動設定。
@@ -170,6 +172,8 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 - 臨時加入只加入指定日期與時段，不會立即點名，也不會沿用到下週。
 - 臨時加入會同步出現在該日期的排課頁。
 - 點名紀錄可修改到班時間或刪除；實際權限仍由 Firestore Rules 控制。
+- 未到班學生可直接登記請假；請假後姓名顯示刪除線與「請假」，並可取消請假。
+- 請假不建立 `attendance`，不增加堂數、期數或繳費提醒；同一學生同日不同時段分開判斷。
 - 「當日課程人次」按排課時段累計；同一位學生一天排兩堂會計為 2 人次，不會依學生去重。
 - 已點名的學生卡使用該筆 `attendance.lessonNumber`，因此同一天第 11、12 堂會各自固定顯示，不會因學生目前堂數更新而一起變動。
 - 桌面版學生卡：
@@ -228,6 +232,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
   - 過去日期、今天已到開始時間、已有點名紀錄或超出時期的格子不顯示。
   - 時間判斷固定使用 `Asia/Taipei`。
 - 已有點名紀錄的排課格以綠色標示並鎖定，不能拖曳更動。
+- 已請假的學生以刪除線、虛線框與「請假」標籤顯示；只鎖定該學生的該日時段，排課格不會因此變綠。
 - 停課學生不出現在排課候選名單與現行排課顯示。
 - 上下學期的週六區塊寬度目前為 `150px`。
 - 平日學生姓名仍採兩兩並列，姓名保持單行。

@@ -23,6 +23,10 @@ function attendanceReference(value) {
   return workspaceDocumentRef(COLLECTIONS.attendance, makeAttendanceId(value));
 }
 
+function leaveRecordReference(value) {
+  return workspaceDocumentRef(COLLECTIONS.leaveRecords, makeAttendanceId(value));
+}
+
 export async function markAttendance({ studentId, dateKey, slot, arrivalTime }) {
   const user = requireCurrentUser();
   if (!isDateKey(dateKey) || !isTimeValue(slot) || !isTimeValue(arrivalTime)) {
@@ -30,13 +34,16 @@ export async function markAttendance({ studentId, dateKey, slot, arrivalTime }) 
   }
   const studentRef = workspaceDocumentRef(COLLECTIONS.students, studentId);
   const recordRef = attendanceReference({ studentId, dateKey, slot });
+  const leaveRef = leaveRecordReference({ studentId, dateKey, slot });
 
   await runTransaction(db, async (transaction) => {
-    const [studentSnapshot, recordSnapshot] = await Promise.all([
+    const [studentSnapshot, recordSnapshot, leaveSnapshot] = await Promise.all([
       transaction.get(studentRef),
       transaction.get(recordRef),
+      transaction.get(leaveRef),
     ]);
     if (!studentSnapshot.exists()) throw new Error("找不到這位學生。");
+    if (leaveSnapshot.exists()) throw new Error("這位學生已登記請假，請先取消請假。");
     if (recordSnapshot.exists()) {
       transaction.update(recordRef, {
         arrivalTime,

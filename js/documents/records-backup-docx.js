@@ -90,7 +90,7 @@ function renderRecordRow(rowXml, row) {
   const replacements = new Map();
   replacements.set(0, replaceCellText(cells[0][0], row.label, row.continuation ? 18 : 24));
   row.records.forEach((record, index) => {
-    replacements.set(index + 1, replaceCellText(cells[index + 1][0], record.shortDate, 18));
+    replacements.set(index + 1, replaceCellText(cells[index + 1][0], record.cellText, 16));
   });
   return replaceIndexedFragments(rowXml, CELL_PATTERN, replacements);
 }

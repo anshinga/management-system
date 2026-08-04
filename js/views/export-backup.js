@@ -63,7 +63,7 @@ function renderWeeklyExportBackup(state, options = {}) {
 
 function renderRecordsPreviewRow(row) {
   const dates = row.records.length
-    ? row.records.map((record) => `<span class="records-backup-date${record.isCarryover ? " is-carryover" : ""}"${record.isCarryover ? ' title="期間開始前最後一堂"' : ""}>${escapeHtml(record.shortDate)}</span>`).join("")
+    ? row.records.map((record) => `<span class="records-backup-date${record.isCarryover ? " is-carryover" : ""}"${record.isCarryover ? ' title="期間開始前最後一堂"' : ""}>${escapeHtml(record.cellText)}</span>`).join("")
     : '<span class="records-backup-empty">尚無課程紀錄</span>';
   return `<div class="records-backup-preview-row"><strong class="records-backup-student${row.continuation ? " is-continuation" : ""}">${escapeHtml(row.label)}</strong><div class="records-backup-dates">${dates}</div></div>`;
 }

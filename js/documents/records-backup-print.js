@@ -41,7 +41,7 @@ function paginateRows(model) {
 
 function renderRow(row) {
   const dates = row?.records || [];
-  return `<tr><th class="records-student${row?.continuation ? " is-continuation" : ""}">${row ? escapeHtml(row.label) : ""}</th>${Array.from({ length: 15 }, (_, index) => `<td>${dates[index] ? escapeHtml(dates[index].shortDate) : ""}</td>`).join("")}</tr>`;
+  return `<tr><th class="records-student${row?.continuation ? " is-continuation" : ""}">${row ? escapeHtml(row.label) : ""}</th>${Array.from({ length: 15 }, (_, index) => `<td>${dates[index] ? escapeHtml(dates[index].cellText) : ""}</td>`).join("")}</tr>`;
 }
 
 function renderPage(model, rows, pageIndex) {
@@ -64,7 +64,7 @@ export function buildRecordsBackupPrintHtml(model) {
     .records-print-page:last-child { break-after: auto; page-break-after: auto; }
     h1 { font-size: 18pt; font-weight: 400; line-height: 1; margin: 0 0 5mm; text-align: center; }
     table { border-collapse: collapse; table-layout: fixed; width: 100%; }
-    th, td { border: 1px solid #000; font-size: 9pt; font-weight: 400; height: 8mm; line-height: 1; overflow: hidden; padding: 0.4mm; text-align: center; vertical-align: middle; white-space: nowrap; }
+    th, td { border: 1px solid #000; font-size: 8pt; font-weight: 400; height: 8mm; line-height: 1; overflow: hidden; padding: 0.4mm; text-align: center; vertical-align: middle; white-space: nowrap; }
     .records-student { font-size: 12pt; }
     .records-student.is-continuation { font-size: 9pt; }
     @media screen { body { background: #eee; padding: 12px; } .records-print-page { background: #fff; margin: 0 auto 12px; max-width: 297mm; min-height: 210mm; padding: 10mm; } }
@@ -86,4 +86,3 @@ export function openRecordsBackupPrintDialog(
   }, 0);
   return popup;
 }
-

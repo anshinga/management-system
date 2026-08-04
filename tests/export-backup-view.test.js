@@ -51,8 +51,8 @@ describe("export backup view", () => {
     expect(html).toContain('data-action="print-records-backup"');
     expect(html).toContain('data-action="select-records-backup-period"');
     expect(html).toContain("115 年 7–8 月課程紀錄");
-    expect(html).toContain("6/30");
-    expect(html).toContain("7/27");
+    expect(html).toContain("6/30，7");
+    expect(html).toContain("7/27，8");
     expect(html).toContain("安安");
     expect(html).not.toContain("停課生");
     expect(html).toContain("匯出只讀取資料，不會修改點名紀錄");

@@ -23,6 +23,14 @@ function formatShortDate(dateKey) {
   return `${month}/${day}`;
 }
 
+function formatRecordCellText(record) {
+  const lessonNumber = Number(record.lessonNumber);
+  const lessonLabel = Number.isFinite(lessonNumber) && lessonNumber > 0
+    ? Math.trunc(lessonNumber)
+    : "—";
+  return `${formatShortDate(record.dateKey)}，${lessonLabel}`;
+}
+
 function chunkRecords(records) {
   if (!records.length) return [[]];
   return Array.from(
@@ -99,6 +107,7 @@ export function buildRecordsBackupModel(
       records: chunk.map((record) => ({
         ...record,
         shortDate: formatShortDate(record.dateKey),
+        cellText: formatRecordCellText(record),
       })),
     }));
   });

@@ -501,7 +501,7 @@ textarea.input { resize: vertical; }
   border: 1px solid var(--line);
   border-radius: 5px;
   display: inline-flex;
-  font-size: 12px;
+  font-size: 11px;
   justify-content: center;
   min-width: 45px;
   padding: 3px 6px;

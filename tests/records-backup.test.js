@@ -63,6 +63,7 @@ describe("records backup domain", () => {
     }, "2026-07", "2026-08-03");
 
     expect(model.rows[0].records.map(({ shortDate }) => shortDate)).toEqual(["6/20"]);
+    expect(model.rows[0].records.map(({ cellText }) => cellText)).toEqual(["6/20，3"]);
     expect(model.rows[1].records).toEqual([]);
   });
 
@@ -82,6 +83,8 @@ describe("records backup domain", () => {
     expect(model.rows[0].records).toHaveLength(15);
     expect(model.rows[0].records.slice(0, 2).map(({ shortDate }) => shortDate))
       .toEqual(["7/1", "7/1"]);
+    expect(model.rows[0].records.slice(0, 2).map(({ cellText }) => cellText))
+      .toEqual(["7/1，1", "7/1，2"]);
     expect(model.rows[1].label).toBe("4.承諺(續)");
     expect(model.rows[1].records).toHaveLength(1);
     expect(model.continuationRowCount).toBe(1);
@@ -92,5 +95,14 @@ describe("records backup domain", () => {
     expect(model.title).toBe("115 年 7–8 月課程紀錄");
     expect(formatRecordsBackupFileName(model)).toBe("2026-07-01_2026-08-31_課程紀錄備份.docx");
     expect(model.pageCount).toBe(3);
+  });
+
+  test("舊紀錄缺少堂數時保留日期並顯示破折號", () => {
+    const model = buildRecordsBackupModel({
+      students: [{ id: "s1", name: "安安", grade: 1, status: "active" }],
+      attendance: [{ studentId: "s1", dateKey: "2026-07-22", arrivalTime: "15:00", term: 1 }],
+    }, "2026-07", "2026-08-03");
+
+    expect(model.rows[0].records[0].cellText).toBe("7/22，—");
   });
 });

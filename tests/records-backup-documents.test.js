@@ -50,8 +50,8 @@ describe("records backup document output", () => {
     const xml = patchRecordsBackupDocumentXml(makeTemplateXml(), makeModel());
     expect(xml).toContain("115 年 7–8 月課程紀錄");
     expect(xml).toContain("1.安&amp;明");
-    expect(xml).toContain("7/1");
-    expect(xml).toContain("7/2");
+    expect(xml).toContain("7/1，1");
+    expect(xml).toContain("7/2，2");
     expect(xml).toContain('<w:noWrap/><w:fitText w:val="1"/>');
     expect(xml.match(/<w:tr>/g)).toHaveLength(66);
     expect(xml).not.toContain("<w:p><w:pPr/></w:p><w:sectPr");
@@ -60,7 +60,7 @@ describe("records backup document output", () => {
   test("第 16 堂會寫入同一學生的續列", () => {
     const xml = patchRecordsBackupDocumentXml(makeTemplateXml(), makeModel(1, 16));
     expect(xml).toContain("1.安&amp;明(續)");
-    expect(xml).toContain("7/16");
+    expect(xml).toContain("7/16，16");
   });
 
   test("超過 67 個學生列時會複製表格列而不省略", () => {
@@ -76,7 +76,7 @@ describe("records backup document output", () => {
     expect(html.match(/class="records-print-page/g)).toHaveLength(3);
     expect(html).toContain("115 年 7–8 月課程紀錄");
     expect(html).toContain("1.安&amp;明(續)");
-    expect(html).toContain("7/16");
+    expect(html).toContain("7/16，16");
     expect(html).toContain("@page { size: A4 landscape;");
     expect(html.match(/<col style=/g)).toHaveLength(16 * 3);
   });

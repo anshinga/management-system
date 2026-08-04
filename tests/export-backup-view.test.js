@@ -32,4 +32,29 @@ describe("export backup view", () => {
     expect(html).toContain("安安");
     expect(html).toContain("匯出只讀取資料，不會修改排課");
   });
+
+  test("課程紀錄模式提供雙月資料夾、Word、列印與一堂一格預覽", () => {
+    const html = renderExportBackup({
+      students: [
+        ...state.students,
+        { id: "paused", name: "停課生", grade: 1, status: "paused" },
+      ],
+      attendance: [
+        { studentId: "s1", dateKey: "2026-06-30", arrivalTime: "15:00", term: 1, lessonNumber: 7 },
+        { studentId: "s1", dateKey: "2026-07-27", arrivalTime: "15:00", term: 1, lessonNumber: 8 },
+        { studentId: "paused", dateKey: "2026-07-27", arrivalTime: "15:00", term: 1, lessonNumber: 8 },
+      ],
+    }, { kind: "records", periodKey: "2026-07", todayDate: "2026-08-03" });
+
+    expect(html).toContain("課程紀錄表");
+    expect(html).toContain('data-action="download-records-backup-word"');
+    expect(html).toContain('data-action="print-records-backup"');
+    expect(html).toContain('data-action="select-records-backup-period"');
+    expect(html).toContain("115 年 7–8 月課程紀錄");
+    expect(html).toContain("6/30");
+    expect(html).toContain("7/27");
+    expect(html).toContain("安安");
+    expect(html).not.toContain("停課生");
+    expect(html).toContain("匯出只讀取資料，不會修改點名紀錄");
+  });
 });

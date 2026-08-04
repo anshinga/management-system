@@ -426,6 +426,25 @@ textarea.input { resize: vertical; }
 .payment-paid-check:has(input:checked) { background: #e5f2e8; border-color: #b8d4be; color: var(--success); }
 .payment-paid-check:has(input:disabled) { cursor: wait; opacity: .65; }
 .export-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.export-backup-mode-switch {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  display: inline-flex;
+  gap: 4px;
+  margin-bottom: 18px;
+  padding: 4px;
+}
+.export-backup-mode {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  font-weight: 600;
+  padding: 8px 14px;
+}
+.export-backup-mode:hover { color: var(--gold-dark); }
+.export-backup-mode.is-active { background: var(--gold-soft); color: var(--gold-dark); }
 .export-backup-week-toolbar { justify-content: flex-start; }
 .export-backup-week-toolbar .week-title { flex: 0 1 310px; text-align: center; }
 .export-backup-stats .stat { display: grid; }
@@ -458,6 +477,37 @@ textarea.input { resize: vertical; }
 .export-backup-slot strong { color: var(--gold-dark); font-size: 12px; }
 .export-backup-slot span { font-size: 12px; overflow-wrap: anywhere; }
 .export-backup-no-class { color: var(--muted); font-size: 12px; margin: 0; padding: 18px 10px; text-align: center; }
+.records-backup-toolbar { justify-content: flex-start; }
+.records-backup-toolbar label { color: var(--muted); font-size: 12px; }
+.records-backup-toolbar label span { display: block; margin-bottom: 4px; }
+.records-backup-toolbar .select { min-width: 230px; }
+.records-backup-legend { align-items: center; color: var(--muted); display: flex; font-size: 12px; gap: 8px; margin-bottom: 12px; }
+.records-backup-preview-list { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.records-backup-preview-row {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(110px, 150px) minmax(0, 1fr);
+  min-height: 48px;
+  padding: 8px 10px;
+}
+.records-backup-preview-row:last-child { border-bottom: 0; }
+.records-backup-student { font-size: 13px; overflow-wrap: anywhere; }
+.records-backup-student.is-continuation { color: var(--muted); font-size: 12px; }
+.records-backup-dates { display: flex; flex-wrap: wrap; gap: 5px; }
+.records-backup-date {
+  background: var(--surface-alt);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  display: inline-flex;
+  font-size: 12px;
+  justify-content: center;
+  min-width: 45px;
+  padding: 3px 6px;
+}
+.records-backup-date.is-carryover { border-style: dashed; color: var(--muted); }
+.records-backup-empty { color: var(--muted); font-size: 12px; }
 .modal-backdrop { align-items: center; background: rgb(0 0 0 / 35%); display: flex; inset: 0; justify-content: center; padding: 20px; position: fixed; z-index: 10; }
 .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); max-height: 90vh; max-width: 520px; overflow: auto; padding: 20px; width: 100%; }
 .modal-head { align-items: center; display: flex; justify-content: space-between; margin-bottom: 15px; }
@@ -756,10 +806,15 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .export-backup-page-head { align-items: stretch; }
   .export-backup-actions { justify-content: flex-start; }
   .export-backup-actions button { flex: 1; }
+  .export-backup-mode-switch { display: flex; width: 100%; }
+  .export-backup-mode { flex: 1; padding-left: 8px; padding-right: 8px; }
   .export-backup-week-toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; }
   .export-backup-week-toolbar .week-title { flex: none; font-size: 13px; width: auto; }
   .export-backup-week-toolbar [data-action="default-backup-week"] { grid-column: 1 / -1; }
   .export-backup-day-grid { grid-template-columns: 1fr; }
   .export-backup-preview { padding: 12px; }
   .export-backup-preview .panel-head { align-items: start; flex-direction: column; }
+  .records-backup-toolbar label, .records-backup-toolbar .select { width: 100%; }
+  .records-backup-legend { align-items: flex-start; flex-direction: column; }
+  .records-backup-preview-row { align-items: start; grid-template-columns: 1fr; }
 }

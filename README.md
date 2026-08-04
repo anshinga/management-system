@@ -1,6 +1,8 @@
-# MPM 點名系統
+# 安信佳點名系統
 
 網站由 GitHub Pages 直接發布；Firebase Authentication 與 Cloud Firestore 只負責登入、權限與雲端資料同步。
+
+登入頁、主系統與家長選課頁使用安信佳標誌；瀏覽器 favicon 與 iOS 主畫面圖示使用大嘴鳥。品牌圖檔集中於 `assets/branding/`，不影響既有 `mpm-main` 工作區或匯出表中的 MPM 名稱。
 
 ## 架構
 

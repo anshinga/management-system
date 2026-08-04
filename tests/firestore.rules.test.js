@@ -568,6 +568,56 @@ describe("Firestore Security Rules", () => {
     }));
   });
 
+  test("最新第 24 堂可在同一交易跨期撤銷並恢復第 23 堂", async () => {
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      const adminDatabase = context.firestore();
+      await setDoc(workspaceDocument(
+        adminDatabase,
+        "attendance",
+        "2026-07-27__16%3A30__student-1",
+      ), {
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "16:30",
+        arrivalTime: "16:28",
+        lessonNumber: 24,
+        term: 1,
+        recordedBy: "teacher-uid",
+        ...timestampFields(),
+      });
+      await updateDoc(workspaceDocument(adminDatabase, "students", "student-1"), {
+        currentLessonCount: 0,
+        currentTerm: 2,
+      });
+    });
+    const database = testEnvironment.authenticatedContext("teacher-uid", {
+      email: "teacher@example.com",
+      email_verified: true,
+    }).firestore();
+    const student = workspaceDocument(database, "students", "student-1");
+    const attendance = workspaceDocument(
+      database,
+      "attendance",
+      "2026-07-27__16%3A30__student-1",
+    );
+
+    await assertFails(runTransaction(database, async (transaction) => {
+      transaction.delete(attendance);
+      transaction.update(student, {
+        currentLessonCount: 23,
+        updatedAt: serverTimestamp(),
+      });
+    }));
+    await assertSucceeds(runTransaction(database, async (transaction) => {
+      transaction.delete(attendance);
+      transaction.update(student, {
+        currentLessonCount: 23,
+        currentTerm: 1,
+        updatedAt: serverTimestamp(),
+      });
+    }));
+  });
+
   test("選課活動只允許老師建立草稿，學生專屬資料不可公開讀寫", async () => {
     const teacherDatabase = testEnvironment.authenticatedContext("teacher-uid", {
       email: "teacher@example.com",

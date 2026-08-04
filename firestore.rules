@@ -603,14 +603,32 @@ service cloud.firestore {
         allow delete: if canTeach(workspaceId)
           && exists(studentPath(workspaceId, resource.data.studentId))
           && existsAfter(studentPath(workspaceId, resource.data.studentId))
-          && get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount is int
-          && get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount > 0
-          && getAfter(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount
-            == get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount - 1
           && getAfter(studentPath(workspaceId, resource.data.studentId)).data
             .diff(get(studentPath(workspaceId, resource.data.studentId)).data)
             .affectedKeys()
-            .hasOnly(["currentLessonCount", "pendingPaymentCount", "paymentPending", "updatedAt"])
+            .hasOnly(["currentLessonCount", "currentTerm", "pendingPaymentCount", "paymentPending", "updatedAt"])
+          && (
+            (
+              get(studentPath(workspaceId, resource.data.studentId)).data.currentTerm
+                == resource.data.term
+              && get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount
+                == resource.data.lessonNumber
+              && get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount > 0
+              && getAfter(studentPath(workspaceId, resource.data.studentId)).data.currentTerm
+                == resource.data.term
+              && getAfter(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount
+                == resource.data.lessonNumber - 1
+            )
+            || (
+              resource.data.lessonNumber == 24
+              && get(studentPath(workspaceId, resource.data.studentId)).data.currentTerm
+                == resource.data.term + 1
+              && get(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount == 0
+              && getAfter(studentPath(workspaceId, resource.data.studentId)).data.currentTerm
+                == resource.data.term
+              && getAfter(studentPath(workspaceId, resource.data.studentId)).data.currentLessonCount == 23
+            )
+          )
           && (
             resource.data.lessonNumber != 20
             || !exists(billingCyclePath(

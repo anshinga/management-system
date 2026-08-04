@@ -11,6 +11,7 @@
 - Google Authentication 負責登入；實際資料權限由 `workspaces/mpm-main/members` 與 Firestore Security Rules 共同決定。
 - `students`、`seasons`、`scheduleEntries`、`scheduleOverrides`、`attendance`、`leaveRecords`、`billingCycles`、`payments` 分開保存，介面透過 Firestore 即時監聽同步。
 - 完成第 20 堂時會在同一個 transaction 內建立繳費提醒；第 24 堂只推進學生期數。確認已繳費後會解除提醒，不再要求輸入金額、方式或備註。
+- 若誤點的最新紀錄剛好是第 24 堂，可安全撤銷並自動恢復原期別第 23 堂；已有下一期點名時仍必須由最新紀錄開始依序撤銷。
 - 「匯出備份」會以唯讀方式從排課資料產生下一週紙本點名表，不會建立或修改 Firestore 文件。
 - `localStorage` 只保存深色模式與目前選取的點名日期，不保存業務資料。
 - Firebase 專案為 `denmin-b0a26`，預設工作區為 `mpm-main`。

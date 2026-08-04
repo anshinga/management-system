@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   deleteDoc: vi.fn(() => Promise.resolve()),
   documents: new Map(),
+  getDoc: vi.fn(),
+  getDocs: vi.fn(),
   runTransaction: vi.fn(),
   serverTimestamp: vi.fn(() => "server-timestamp"),
   transaction: {
@@ -15,8 +17,8 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("firebase/firestore", () => ({
   deleteDoc: mocks.deleteDoc,
-  getDoc: vi.fn(),
-  getDocs: vi.fn(),
+  getDoc: mocks.getDoc,
+  getDocs: mocks.getDocs,
   limit: vi.fn(),
   orderBy: vi.fn(),
   query: vi.fn(),
@@ -42,7 +44,9 @@ vi.mock("../js/repositories/firestore-paths.js", () => ({
   workspaceDocumentRef: (collection, id) => `${collection}/${id}`,
 }));
 
-const { markAttendance } = await import("../js/repositories/attendance-repository.js");
+const { markAttendance, removeLatestAttendance } = await import(
+  "../js/repositories/attendance-repository.js"
+);
 const { cancelStudentLeave, markStudentLeave } = await import(
   "../js/repositories/leave-repository.js"
 );
@@ -63,6 +67,8 @@ const recordId = "2026-07-27__15%3A00__student-1";
 
 beforeEach(() => {
   mocks.deleteDoc.mockClear();
+  mocks.getDoc.mockReset();
+  mocks.getDocs.mockReset();
   mocks.documents.clear();
   Object.values(mocks.transaction).forEach((mock) => mock.mockClear());
   mocks.documents.set("students/student-1", snapshot(true, {
@@ -112,5 +118,73 @@ describe("請假 repository", () => {
     await cancelStudentLeave(target);
 
     expect(mocks.deleteDoc).toHaveBeenCalledWith(`leaveRecords/${recordId}`);
+  });
+
+  test("最新第 24 堂可跨期撤銷並恢復原期別第 23 堂", async () => {
+    const attendanceData = {
+      studentId: "student-1",
+      dateKey: "2026-07-27",
+      slot: "15:00",
+      lessonNumber: 24,
+      term: 1,
+    };
+    mocks.getDoc.mockResolvedValue(snapshot(true, attendanceData));
+    mocks.getDocs.mockResolvedValue({
+      docs: [{ id: recordId }],
+      empty: false,
+    });
+    mocks.documents.set(`attendance/${recordId}`, snapshot(true, attendanceData));
+    mocks.documents.set("students/student-1", snapshot(true, {
+      currentLessonCount: 0,
+      currentTerm: 2,
+      pendingPaymentCount: 1,
+    }));
+
+    await removeLatestAttendance(recordId);
+
+    expect(mocks.transaction.delete).toHaveBeenCalledWith(`attendance/${recordId}`);
+    expect(mocks.transaction.update).toHaveBeenCalledWith("students/student-1", {
+      currentLessonCount: 23,
+      currentTerm: 1,
+      updatedAt: "server-timestamp",
+    });
+  });
+
+  test("第 24 堂之後已有新一期點名時仍禁止跨期撤銷", async () => {
+    const attendanceData = {
+      studentId: "student-1",
+      dateKey: "2026-07-27",
+      slot: "15:00",
+      lessonNumber: 24,
+      term: 1,
+    };
+    mocks.getDoc.mockResolvedValue(snapshot(true, attendanceData));
+    mocks.getDocs.mockResolvedValue({
+      docs: [{ id: "newer-attendance" }],
+      empty: false,
+    });
+
+    await expect(removeLatestAttendance(recordId)).rejects.toThrow("只能刪除這位學生最新的一筆點名");
+    expect(mocks.transaction.delete).not.toHaveBeenCalled();
+  });
+
+  test("學生進度已進入新一期時不會誤將第 24 堂回復", async () => {
+    const attendanceData = {
+      studentId: "student-1",
+      dateKey: "2026-07-27",
+      slot: "15:00",
+      lessonNumber: 24,
+      term: 1,
+    };
+    mocks.getDoc.mockResolvedValue(snapshot(true, attendanceData));
+    mocks.getDocs.mockResolvedValue({ docs: [{ id: recordId }], empty: false });
+    mocks.documents.set(`attendance/${recordId}`, snapshot(true, attendanceData));
+    mocks.documents.set("students/student-1", snapshot(true, {
+      currentLessonCount: 1,
+      currentTerm: 2,
+    }));
+
+    await expect(removeLatestAttendance(recordId)).rejects.toThrow("請依時間倒序撤銷");
+    expect(mocks.transaction.delete).not.toHaveBeenCalled();
   });
 });

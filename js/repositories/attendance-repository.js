@@ -158,9 +158,19 @@ export async function removeLatestAttendance(attendanceId) {
       cycleRef ? transaction.get(cycleRef) : Promise.resolve(null),
     ]);
     if (!freshRecord.exists() || !studentSnapshot.exists()) throw new Error("點名或學生資料已不存在。");
+    const freshData = freshRecord.data();
     const student = studentSnapshot.data();
-    if (Number(freshRecord.data().term) !== Number(student.currentTerm)) {
-      throw new Error("已結算期別的點名不可刪除；請保留紀錄並另行備註調整。");
+    const recordTerm = Number(freshData.term);
+    const lessonNumber = Number(freshData.lessonNumber);
+    const currentTerm = Number(student.currentTerm);
+    const currentLessonCount = Number(student.currentLessonCount);
+    const isCurrentTermLatest = recordTerm === currentTerm
+      && lessonNumber === currentLessonCount;
+    const isCompletedTermLatest = lessonNumber === 24
+      && currentTerm === recordTerm + 1
+      && currentLessonCount === 0;
+    if (!isCurrentTermLatest && !isCompletedTermLatest) {
+      throw new Error("這筆點名之後已有其他堂課，請依時間倒序撤銷最新點名。");
     }
     transaction.delete(recordRef);
     const removesPendingReminder = cycleSnapshot?.exists()
@@ -170,7 +180,8 @@ export async function removeLatestAttendance(attendanceId) {
       ? Math.max(0, Number(student.pendingPaymentCount || 0) - 1)
       : Number(student.pendingPaymentCount || 0);
     transaction.update(studentRef, {
-      currentLessonCount: Math.max(0, Number(student.currentLessonCount || 0) - 1),
+      currentLessonCount: isCompletedTermLatest ? 23 : currentLessonCount - 1,
+      ...(isCompletedTermLatest ? { currentTerm: recordTerm } : {}),
       ...(removesPendingReminder ? {
         pendingPaymentCount,
         paymentPending: pendingPaymentCount > 0,

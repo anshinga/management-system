@@ -271,7 +271,7 @@ function openAttendanceModal(app, state, record, showToast) {
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("aria-labelledby", "edit-attendance-title");
-  modal.innerHTML = `<form class="modal-form" data-attendance-form><div class="modal-head"><h3 id="edit-attendance-title">修改點名</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label for="edit-attendance-student">點名學生</label><input class="input" id="edit-attendance-student" disabled value="${escapeAttribute(student?.name || "未知學生")}" /></div><div class="field"><label for="edit-arrival-time">到班時間</label><input class="input" id="edit-arrival-time" name="arrivalTime" type="time" required value="${escapeAttribute(record.arrivalTime || "")}" /></div><div class="field"><label for="edit-attendance-date">點名日期</label><input class="input" id="edit-attendance-date" type="date" disabled value="${escapeAttribute(record.dateKey)}" /></div></div><p class="student-subtitle">為維持堂數與付款歷史一致，已完成的點名不可改成其他學生。</p><div class="form-actions"><button class="button-danger" type="button" data-remove-attendance>刪除這筆點名</button><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit">儲存修改</button></div></form>`;
+  modal.innerHTML = `<form class="modal-form" data-attendance-form><div class="modal-head"><h3 id="edit-attendance-title">修改點名</h3><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="modal-form-grid"><div class="field field-wide"><label for="edit-attendance-student">點名學生</label><input class="input" id="edit-attendance-student" disabled value="${escapeAttribute(student?.name || "未知學生")}" /></div><div class="field"><label for="edit-arrival-time">到班時間</label><input class="input" id="edit-arrival-time" name="arrivalTime" type="time" required value="${escapeAttribute(record.arrivalTime || "")}" /></div><div class="field"><label for="edit-attendance-date">點名日期</label><input class="input" id="edit-attendance-date" type="date" disabled value="${escapeAttribute(record.dateKey)}" /></div></div><p class="student-subtitle">只能刪除這位學生最新一筆點名；第 24 堂會自動退回原期別第 23 堂。</p><div class="form-actions"><button class="button-danger" type="button" data-remove-attendance>刪除這筆點名</button><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit">儲存修改</button></div></form>`;
   backdrop.append(modal);
   app.append(backdrop);
   const form = modal.querySelector("[data-attendance-form]");
@@ -293,11 +293,15 @@ function openAttendanceModal(app, state, record, showToast) {
     }
   });
   modal.querySelector("[data-remove-attendance]").addEventListener("click", async () => {
-    if (!window.confirm("確定要刪除這筆點名紀錄嗎？學生堂數也會扣回一堂。")) return;
+    const isCompletedTerm = Number(record.lessonNumber) === 24;
+    const confirmationMessage = isCompletedTerm
+      ? `這筆是第 ${record.term} 期第 24 堂。刪除後會恢復為第 ${record.term} 期第 23 堂；若已有下一期點名則無法刪除。確定要繼續嗎？`
+      : "確定要刪除這筆點名紀錄嗎？學生堂數也會扣回一堂。";
+    if (!window.confirm(confirmationMessage)) return;
     try {
       await removeLatestAttendance(record.id);
       close();
-      showToast("點名紀錄已刪除");
+      showToast(isCompletedTerm ? "點名已刪除，學生已恢復為原期別第 23 堂" : "點名紀錄已刪除");
     } catch (error) {
       showToast(getUserErrorMessage(error, "點名刪除失敗"));
     }

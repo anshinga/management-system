@@ -77,7 +77,7 @@ describe("export backup domain", () => {
     expect(state).toEqual(original);
   });
 
-  test("超過版型容量時在原時段增加續頁，不挪到其他時段", () => {
+  test("原時段超過容量時先補到同一天的下一個時段", () => {
     const students = Array.from({ length: 9 }, (_, index) => student(`s${index + 1}`, index + 1));
     const state = {
       students,
@@ -93,14 +93,75 @@ describe("export backup domain", () => {
 
     const model = buildBackupExportModel(state, "2026-08-03");
     const firstPage = getBackupPageCellStudents(model, 0, "2026-08-03", "15:00");
-    const secondPage = getBackupPageCellStudents(model, 1, "2026-08-03", "15:00");
+    const nextSlot = getBackupPageCellStudents(model, 0, "2026-08-03", "16:30");
+
+    expect(model.pageCount).toBe(1);
+    expect(model.reassignedOccurrenceCount).toBe(1);
+    expect(firstPage).toHaveLength(8);
+    expect(nextSlot).toHaveLength(1);
+    expect(getBackupTemplatePlacements(model)).toContainEqual(
+      expect.objectContaining({ row: 5, column: 1, slot: "16:30", student: nextSlot[0] }),
+    );
+  });
+
+  test("下一時段已滿時繼續向後補位，並保留各時段原排課學生的優先位置", () => {
+    const early = Array.from({ length: 10 }, (_, index) => student(`early-${index + 1}`, index + 1));
+    const middle = Array.from({ length: 8 }, (_, index) => student(`middle-${index + 1}`, index + 1));
+    const evening = Array.from({ length: 9 }, (_, index) => student(`evening-${index + 1}`, index + 1));
+    const students = [...early, ...middle, ...evening];
+    const entries = [
+      ...early.map(({ id }) => ({ studentId: id, slot: "15:00" })),
+      ...middle.map(({ id }) => ({ studentId: id, slot: "16:30" })),
+      ...evening.map(({ id }) => ({ studentId: id, slot: "18:00" })),
+    ].map((entry) => ({
+      ...entry,
+      seasonId: summer.id,
+      dateKey: "2026-08-03",
+    }));
+
+    const model = buildBackupExportModel({
+      students,
+      seasons: [summer],
+      scheduleEntries: entries,
+      scheduleOverrides: [],
+    }, "2026-08-03");
+    const at1800 = getBackupPageCellStudents(model, 0, "2026-08-03", "18:00");
+    const at1930 = getBackupPageCellStudents(model, 0, "2026-08-03", "19:30");
+
+    expect(model.pageCount).toBe(1);
+    expect(model.reassignedOccurrenceCount).toBe(2);
+    expect(at1800.slice(0, 9).map(({ id }) => id)).toEqual(evening.map(({ id }) => id));
+    expect(at1800[9].id).toBe("early-9");
+    expect(at1930.map(({ id }) => id)).toEqual(["early-10"]);
+  });
+
+  test("同一天最後時段也放滿時才建立續頁", () => {
+    const slotCounts = { "15:00": 8, "16:30": 8, "18:00": 10, "19:30": 11 };
+    const students = Object.entries(slotCounts).flatMap(([slot, count]) => (
+      Array.from({ length: count }, (_, index) => student(`${slot}-${index + 1}`, index + 1))
+    ));
+    const scheduleEntries = Object.entries(slotCounts).flatMap(([slot, count]) => (
+      Array.from({ length: count }, (_, index) => ({
+        studentId: `${slot}-${index + 1}`,
+        seasonId: summer.id,
+        dateKey: "2026-08-03",
+        slot,
+      }))
+    ));
+
+    const model = buildBackupExportModel({
+      students,
+      seasons: [summer],
+      scheduleEntries,
+      scheduleOverrides: [],
+    }, "2026-08-03");
+    const continuation = getBackupPageCellStudents(model, 1, "2026-08-03", "19:30");
 
     expect(model.pageCount).toBe(2);
-    expect(firstPage).toHaveLength(8);
-    expect(secondPage).toHaveLength(1);
-    expect(getBackupPageCellStudents(model, 1, "2026-08-03", "16:30")).toEqual([]);
+    expect(model.reassignedOccurrenceCount).toBe(0);
+    expect(continuation).toHaveLength(1);
     expect(getBackupTemplatePlacements(model, 1)).toEqual([
-      expect.objectContaining({ row: 1, column: 1, slot: "15:00", student: secondPage[0] }),
+      expect.objectContaining({ row: 14, column: 1, slot: "19:30", student: continuation[0] }),
     ]);
   });
 

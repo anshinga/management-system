@@ -101,12 +101,34 @@ function capacityFor(dayIndex, slot) {
   return layout?.capacity || 1;
 }
 
-function pageCells(days, pageIndex) {
-  return Object.fromEntries(days.flatMap((day) => day.slots.map(({ slot, students }) => {
-    const capacity = capacityFor(day.weekdayIndex, slot);
-    const start = pageIndex * capacity;
-    return [cellKey(day.dateKey, slot), students.slice(start, start + capacity)];
-  })));
+function allocateDayPages(day) {
+  if (!day.slots.length) return { pages: [{}], reassignedOccurrenceCount: 0 };
+  const remainingBySlot = day.slots.map(({ students }) => [...students]);
+  const pages = [];
+  let reassignedOccurrenceCount = 0;
+
+  while (remainingBySlot.some((students) => students.length) || !pages.length) {
+    const pageSlots = day.slots.map(({ slot }, slotIndex) => (
+      remainingBySlot[slotIndex].splice(0, capacityFor(day.weekdayIndex, slot))
+    ));
+
+    remainingBySlot.forEach((overflow, sourceIndex) => {
+      for (let targetIndex = sourceIndex + 1; overflow.length && targetIndex < day.slots.length; targetIndex += 1) {
+        const targetCapacity = capacityFor(day.weekdayIndex, day.slots[targetIndex].slot);
+        const available = Math.max(0, targetCapacity - pageSlots[targetIndex].length);
+        if (!available) continue;
+        const moved = overflow.splice(0, available);
+        pageSlots[targetIndex].push(...moved);
+        reassignedOccurrenceCount += moved.length;
+      }
+    });
+
+    pages.push(Object.fromEntries(day.slots.map(({ slot }, slotIndex) => (
+      [slot, pageSlots[slotIndex]]
+    ))));
+  }
+
+  return { pages, reassignedOccurrenceCount };
 }
 
 export function getDefaultBackupWeekStart(now = new Date()) {
@@ -179,15 +201,19 @@ export function buildBackupExportModel(state, weekStartInput = getDefaultBackupW
   const uniqueStudentIds = new Set(days.flatMap((day) => (
     day.slots.flatMap((slot) => slot.students.map((student) => student.id))
   )));
-  const pageCount = Math.max(1, ...days.flatMap((day) => day.slots.map(({ slot, students }) => (
-    Math.ceil(students.length / capacityFor(day.weekdayIndex, slot))
-  ))));
+  const allocatedDays = days.map((day) => allocateDayPages(day));
+  const pageCount = Math.max(1, ...allocatedDays.map(({ pages }) => pages.length));
+  const reassignedOccurrenceCount = allocatedDays.reduce((total, allocation) => (
+    total + allocation.reassignedOccurrenceCount
+  ), 0);
   const year = weekStartDate.getFullYear();
   const month = weekStartDate.getMonth() + 1;
   const pages = Array.from({ length: pageCount }, (_, pageIndex) => ({
     pageNumber: pageIndex + 1,
     title: `${year} MPM ${month}月上課時間表${pageIndex ? `（續頁 ${pageIndex + 1}）` : ""}`,
-    cells: pageCells(days, pageIndex),
+    cells: Object.fromEntries(days.flatMap((day, dayIndex) => day.slots.map(({ slot }) => (
+      [cellKey(day.dateKey, slot), allocatedDays[dayIndex].pages[pageIndex]?.[slot] || []]
+    )))),
   }));
 
   return {
@@ -200,6 +226,7 @@ export function buildBackupExportModel(state, weekStartInput = getDefaultBackupW
     days,
     pages,
     pageCount,
+    reassignedOccurrenceCount,
     totalOccurrences,
     uniqueStudentCount: uniqueStudentIds.size,
   };

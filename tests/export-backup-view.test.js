@@ -33,6 +33,30 @@ describe("export backup view", () => {
     expect(html).toContain("匯出只讀取資料，不會修改排課");
   });
 
+  test("時段超過容量時說明會補到同一天後續時段", () => {
+    const students = Array.from({ length: 9 }, (_, index) => ({
+      id: `overflow-${index + 1}`,
+      name: `學生${index + 1}`,
+      grade: index + 1,
+      status: "active",
+    }));
+    const html = renderExportBackup({
+      students,
+      seasons: state.seasons,
+      scheduleEntries: students.map(({ id }) => ({
+        studentId: id,
+        seasonId: "summer-2026",
+        dateKey: "2026-08-03",
+        slot: "15:00",
+      })),
+      scheduleOverrides: [],
+    }, { weekStart: "2026-08-03" });
+
+    expect(html).toContain("有 1 人次因原時段容量不足");
+    expect(html).toContain("同一天的後續時段");
+    expect(html).toContain('<strong class="stat-value">1</strong><small class="stat-note">頁</small>');
+  });
+
   test("課程紀錄模式提供雙月資料夾、Word、列印與一堂一格預覽", () => {
     const html = renderExportBackup({
       students: [

@@ -27,16 +27,38 @@ function replaceTextNodes(fragment, value) {
 }
 
 function nameRunXml(value) {
-  return `<w:r><w:rPr><w:rFonts w:ascii="Microsoft JhengHei" w:hAnsi="Microsoft JhengHei" w:eastAsia="微軟正黑體"/><w:sz w:val="28"/><w:szCs w:val="28"/></w:rPr><w:t>${escapeXml(value)}</w:t></w:r>`;
+  const length = Array.from(String(value || "")).length;
+  const size = length <= 2 ? 28 : length === 3 ? 20 : 16;
+  return `<w:r><w:rPr><w:rFonts w:ascii="Microsoft JhengHei" w:hAnsi="Microsoft JhengHei" w:eastAsia="微軟正黑體"/><w:sz w:val="${size}"/><w:szCs w:val="${size}"/></w:rPr><w:t>${escapeXml(value)}</w:t></w:r>`;
+}
+
+function fitCellText(cellXml) {
+  const cellProperties = cellXml.match(/<w:tcPr\b[\s\S]*?<\/w:tcPr>/)?.[0];
+  if (cellProperties) {
+    const fittedProperties = cellProperties
+      .replace(/<w:noWrap\b[^>]*\/>/g, "")
+      .replace(/<w:fitText\b[^>]*\/>/g, "")
+      .replace("</w:tcPr>", '<w:noWrap/><w:fitText w:val="1"/></w:tcPr>');
+    return cellXml.replace(cellProperties, fittedProperties);
+  }
+
+  const emptyCellProperties = cellXml.match(/<w:tcPr\b([^>]*)\/>/);
+  if (!emptyCellProperties) return cellXml;
+  const attributes = emptyCellProperties[1] || "";
+  return cellXml.replace(
+    emptyCellProperties[0],
+    `<w:tcPr${attributes}><w:noWrap/><w:fitText w:val="1"/></w:tcPr>`,
+  );
 }
 
 function replaceCellText(cellXml, value) {
+  const fittedCellXml = fitCellText(cellXml);
   const paragraphPattern = /<w:p\b([^>]*)>([\s\S]*?)<\/w:p>/;
-  const match = cellXml.match(paragraphPattern);
+  const match = fittedCellXml.match(paragraphPattern);
   if (!match) throw new Error("Word 範本的學生欄位格式不正確。");
   const paragraphContent = match[2].replace(/<w:r\b[\s\S]*?<\/w:r>/g, "");
   const paragraph = `<w:p${match[1]}>${paragraphContent}${nameRunXml(value)}</w:p>`;
-  return cellXml.replace(paragraphPattern, paragraph);
+  return fittedCellXml.replace(paragraphPattern, paragraph);
 }
 
 function replaceIndexedFragments(source, pattern, replacements) {

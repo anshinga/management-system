@@ -45,7 +45,10 @@ function renderExportNotes(model) {
     return '<p class="export-backup-notice">這一週目前沒有可匯出的在讀學生排課，仍可下載空白備份表。</p>';
   }
   if (model.pageCount > 1) {
-    return `<p class="export-backup-notice is-warning">有時段超過單頁容量，將依原日期與原時段輸出為 ${model.pageCount} 頁，不會移動或省略學生。</p>`;
+    return `<p class="export-backup-notice is-warning">原時段放不下時會先補到同一天的後續時段；所有後續時段都滿後才建立續頁，本週共輸出 ${model.pageCount} 頁，不會移到其他日期或省略學生。</p>`;
+  }
+  if (model.reassignedOccurrenceCount) {
+    return `<p class="export-backup-notice">有 ${model.reassignedOccurrenceCount} 人次因原時段容量不足，匯出時已依序補到同一天的後續時段；實際排課不會被修改。</p>`;
   }
   return '<p class="export-backup-notice">姓名右側會保留空白註記欄；匯出只讀取資料，不會修改排課。</p>';
 }

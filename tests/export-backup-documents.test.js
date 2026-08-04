@@ -6,7 +6,7 @@ import { patchBackupDocumentXml } from "../js/documents/backup-docx.js";
 import { buildBackupPrintHtml } from "../js/documents/backup-print.js";
 
 function makeTemplateXml() {
-  const cell = (text = "") => `<w:tc><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`;
+  const cell = (text = "") => `<w:tc><w:tcPr/><w:p><w:r><w:t>${text}</w:t></w:r></w:p></w:tc>`;
   const header = `<w:tr>${Array.from({ length: 7 }, (_, index) => cell(index ? `${index}` : "星期時間")).join("")}</w:tr>`;
   const body = Array.from({ length: 18 }, () => (
     `<w:tr>${Array.from({ length: 23 }, () => cell()).join("")}</w:tr>`
@@ -55,20 +55,22 @@ describe("backup document output", () => {
     expect(xml).toContain("8/3一");
     expect(xml).toContain("安&amp;明");
     expect(xml).toContain('w:eastAsia="微軟正黑體"');
+    expect(xml).toContain('<w:sz w:val="20"/>');
+    expect(xml).toContain('<w:noWrap/><w:fitText w:val="1"/>');
     expect(xml.match(/<w:tbl>/g)).toHaveLength(1);
     expect(xml).not.toContain('w:type="page"');
   });
 
   test("Word XML 會複製完整課表作為續頁", () => {
-    const xml = patchBackupDocumentXml(makeTemplateXml(), makeModel(9));
+    const xml = patchBackupDocumentXml(makeTemplateXml(), makeModel(37));
     expect(xml.match(/<w:tbl>/g)).toHaveLength(2);
     expect(xml).toContain("（續頁 2）");
     expect(xml.match(/w:type="page"/g)).toHaveLength(1);
-    expect(xml).toContain("學生8");
+    expect(xml).toContain("學生36");
   });
 
-  test("列印版保留註記欄、原時段與每一頁", () => {
-    const html = buildBackupPrintHtml(makeModel(9, "<安安>"));
+  test("列印版保留註記欄、時段與每一頁", () => {
+    const html = buildBackupPrintHtml(makeModel(37, "<安安>"));
     expect(html.match(/class="backup-print-page"/g)).toHaveLength(2);
     expect(html).toContain("backup-note");
     expect(html).toContain("3:00");

@@ -15,6 +15,7 @@ import {
   getPaymentReminderItems,
   needsPaymentReminder,
 } from "../domain/payments.js";
+import { isDateKey, isTimeValue } from "../domain/models.js";
 import {
   markAttendance,
   removeLatestAttendance,
@@ -33,7 +34,10 @@ import { escapeAttribute, escapeHtml } from "../ui/html.js";
 import { getUserErrorMessage } from "../ui/errors.js";
 
 const weekdays = ["週一", "週二", "週三", "週四", "週五", "週六"];
+const ATTENDANCE_ACTIVE_DURATION_MS = 90 * 60 * 1000;
+const ATTENDANCE_STATUS_TIMER_BUFFER_MS = 50;
 let lastEnsuredAttendanceWeekKey = "";
+let attendanceStatusRefreshTimer;
 
 function displayDate(date) {
   const [year, month, day] = date.split("-");
@@ -62,6 +66,40 @@ function compareFallbackArrivalTime(a, b) {
   if (aTime && !bTime) return -1;
   if (!aTime && bTime) return 1;
   return a.index - b.index;
+}
+
+function toMillis(value) {
+  if (value instanceof Date) return value.getTime();
+  return typeof value === "number" ? value : Number.NaN;
+}
+
+export function getAttendanceSessionTimes(record) {
+  if (!isDateKey(record?.dateKey) || !isTimeValue(record?.arrivalTime)) return null;
+  const startAt = Date.parse(`${record.dateKey}T${record.arrivalTime}:00+08:00`);
+  if (!Number.isFinite(startAt)) return null;
+  return {
+    startAt,
+    endAt: startAt + ATTENDANCE_ACTIVE_DURATION_MS,
+  };
+}
+
+export function isAttendanceInActiveWindow(record, now = new Date()) {
+  const times = getAttendanceSessionTimes(record);
+  const nowMillis = toMillis(now);
+  return Boolean(times
+    && Number.isFinite(nowMillis)
+    && nowMillis >= times.startAt
+    && nowMillis < times.endAt);
+}
+
+export function getNextAttendanceStatusChangeDelay(attendance = [], now = new Date()) {
+  const nowMillis = toMillis(now);
+  if (!Number.isFinite(nowMillis)) return null;
+  const delays = attendance
+    .map(getAttendanceSessionTimes)
+    .filter((times) => times && nowMillis >= times.startAt && nowMillis < times.endAt)
+    .map((times) => times.endAt - nowMillis);
+  return delays.length ? Math.min(...delays) : null;
 }
 
 export function sortRollCallStudentIds(
@@ -102,7 +140,7 @@ export function sortRollCallStudentIds(
     .map(({ studentId }) => studentId);
 }
 
-export function renderRollCall(state, refresh) {
+export function renderRollCall(state, { now = new Date() } = {}) {
   const date = getSelectedAttendanceDate();
   const dateObject = parseDate(date);
   const weekday = getWeekday(dateObject);
@@ -159,12 +197,13 @@ export function renderRollCall(state, refresh) {
             slot,
             schedule,
             season?.id,
+            now,
           )).join("")
         : '<div class="panel empty"><strong>今日未營業</strong><p>這個日期沒有開放上課時段。</p></div>'}
     </div>`;
 }
 
-function renderClass(state, date, slot, schedule, seasonId) {
+function renderClass(state, date, slot, schedule, seasonId, now) {
   const temporaryStudentIds = new Set(schedule.temporaryStudentIds || []);
   const resolvedSeasonId = seasonId || schedule.season || "";
   const orderedStudentIds = sortRollCallStudentIds(schedule.studentIds, {
@@ -176,6 +215,7 @@ function renderClass(state, date, slot, schedule, seasonId) {
   return `<section class="class-section"><div class="class-heading"><h3>${slot}</h3><span>${schedule.studentIds.length} 人</span></div><div class="class-students roll-call-drop-zone" data-roll-call-drop-slot="${escapeAttribute(slot)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-season="${escapeAttribute(resolvedSeasonId)}">${orderedStudentIds.map((id) => renderStudent(state, date, slot, id, {
     seasonId: resolvedSeasonId,
     isTemporary: temporaryStudentIds.has(id),
+    now,
   })).join("")}${renderTemporaryStudentCard(slot)}</div></section>`;
 }
 
@@ -191,7 +231,7 @@ export function shouldAutoFocusTemporaryStudentSearch(viewport = globalThis) {
   return viewport.matchMedia?.("(min-width: 721px)")?.matches === true;
 }
 
-function renderStudent(state, date, slot, id, { seasonId, isTemporary }) {
+function renderStudent(state, date, slot, id, { seasonId, isTemporary, now }) {
   const student = getStudent(state, id);
   const record = state.attendance.find((item) => item.studentId === id && item.dateKey === date && item.slot === slot);
   const leaveRecord = (state.leaveRecords || []).find((item) => (
@@ -203,7 +243,9 @@ function renderStudent(state, date, slot, id, { seasonId, isTemporary }) {
   const isResolved = Boolean(record || leaveRecord);
   const moveAttributes = isResolved ? "" : ` draggable="true" data-roll-call-student="${escapeAttribute(id)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-slot="${escapeAttribute(slot)}" data-roll-call-season="${escapeAttribute(seasonId)}" data-roll-call-temporary="${isTemporary}"`;
   const dragHandle = isResolved ? "" : `<button class="roll-call-drag-handle" data-action="drag-roll-call-student" type="button" aria-label="拖曳 ${escapeAttribute(student.name)} 調整今日時段" title="拖曳調整今日時段"><span aria-hidden="true">⋮⋮</span></button>`;
-  const cardStatusClass = record ? " is-present" : leaveRecord ? " is-on-leave" : " is-draggable";
+  const cardStatusClass = record
+    ? ` is-present${isAttendanceInActiveWindow(record, now) ? " is-in-session" : ""}`
+    : leaveRecord ? " is-on-leave" : " is-draggable";
   const statusText = record ? escapeHtml(record.arrivalTime) : leaveRecord ? "請假" : "未到";
   const actions = record
     ? `<span class="attendance-time">${escapeHtml(record.arrivalTime)} 到班</span><button class="button-secondary button-edit-attendance" data-action="edit-attendance" data-attendance-id="${escapeAttribute(record.id)}"><span class="roll-call-desktop-label">修改點名</span><span class="roll-call-mobile-label">修改</span></button>`
@@ -511,6 +553,18 @@ function bindRollCallScheduleDrag(app, state, showToast) {
 export function bindRollCall(app, state, refresh, showToast) {
   const selectedDate = getSelectedAttendanceDate();
   const selectedSeason = getSeasonForDate(state, selectedDate);
+  globalThis.clearTimeout(attendanceStatusRefreshTimer);
+  attendanceStatusRefreshTimer = undefined;
+  const nextStatusChangeDelay = getNextAttendanceStatusChangeDelay(
+    state.attendance.filter((record) => record.dateKey === selectedDate),
+  );
+  if (nextStatusChangeDelay !== null) {
+    attendanceStatusRefreshTimer = globalThis.setTimeout(() => {
+      attendanceStatusRefreshTimer = undefined;
+      const route = globalThis.location?.hash?.replace("#", "") || "roll-call";
+      if (route === "roll-call") refresh(true);
+    }, nextStatusChangeDelay + ATTENDANCE_STATUS_TIMER_BUFFER_MS);
+  }
   const ensureKey = `${selectedSeason?.id || ""}:${getWeekStart(parseDate(selectedDate)).toISOString()}`;
   if (selectedSeason && ensureKey !== lastEnsuredAttendanceWeekKey) {
     lastEnsuredAttendanceWeekKey = ensureKey;

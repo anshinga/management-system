@@ -134,6 +134,8 @@ textarea.input { resize: vertical; }
 .roll-call-student-card .attendance-actions { flex: 0 0 auto; gap: 6px; }
 .roll-call-drag-handle { display: none; }
 .student-card.is-present { background: #f2f8f2; border-color: #b8d4be; }
+.student-card.is-present.is-in-session { background: #f3edf9; border-color: #bca4d2; }
+.student-card.is-present.is-in-session .attendance-time { color: #76528f; }
 .student-card.is-on-leave { background: var(--surface-alt); border-style: dashed; }
 .student-card.is-on-leave .student-name { text-decoration: line-through; text-decoration-thickness: 1.5px; }
 .temporary-student-card { background: transparent; border-style: dashed; color: var(--muted); cursor: pointer; justify-content: flex-start; text-align: left; }
@@ -551,6 +553,8 @@ textarea.input { resize: vertical; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 body.dark { --bg: #1d1e1b; --surface: #282925; --surface-alt: #22231f; --text: #f2f1e9; --muted: #a8a99e; --line: #464740; --gold-soft: #4c401d; --success: #8fc29a; --warning: #e1a56f; }
 body.dark .student-card.is-present { background: #283b2d; border-color: #53755b; }
+body.dark .student-card.is-present.is-in-session { background: #3a3045; border-color: #755d89; }
+body.dark .student-card.is-present.is-in-session .attendance-time { color: #cfb1e2; }
 body.dark .schedule-student.is-present { background: #283b2d; border-color: #53755b; color: var(--success); }
 body.dark .student-card.is-on-leave, body.dark .schedule-student.is-on-leave { background: #302d26; }
 body.dark .student-status-select.active { background-color: #283b2d; border-color: #53755b; }

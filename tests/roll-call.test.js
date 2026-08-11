@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 const moveScheduleEntryForDateMock = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 
@@ -21,6 +21,9 @@ vi.mock("../js/repositories/schedule-repository.js", () => ({
 
 const {
   bindRollCall,
+  getAttendanceSessionTimes,
+  getNextAttendanceStatusChangeDelay,
+  isAttendanceInActiveWindow,
   renderRollCall,
   renderTemporaryStudentOption,
   shouldAutoFocusTemporaryStudentSearch,
@@ -49,6 +52,10 @@ beforeEach(() => {
     setItem: (key, value) => values.set(key, String(value)),
   });
   moveScheduleEntryForDateMock.mockClear();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 class FakeDragElement {
@@ -115,6 +122,94 @@ describe("roll-call view", () => {
     expect(html).toContain(">18:00<");
     expect(html).toContain(">19:30<");
     expect(html).toContain("只加入本日，不會立即點名");
+  });
+
+  test("到班後未滿九十分鐘顯示紫色，滿九十分鐘恢復綠色", () => {
+    const attendanceState = {
+      ...state,
+      students: [{
+        id: "student-1",
+        name: "允涵",
+        grade: 7,
+        status: "active",
+        currentLessonCount: 12,
+      }],
+      schedules: [{
+        id: "summer-2026-2026-07-27-15:00",
+        season: "summer-2026",
+        date: "2026-07-27",
+        slot: "15:00",
+        studentIds: ["student-1"],
+      }],
+      attendance: [{
+        id: "2026-07-27__15%3A00__student-1",
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+        arrivalTime: "15:00",
+        lessonNumber: 12,
+      }],
+    };
+
+    const activeHtml = renderRollCall(attendanceState, {
+      now: new Date("2026-07-27T16:29:59+08:00"),
+    });
+    const completedHtml = renderRollCall(attendanceState, {
+      now: new Date("2026-07-27T16:30:00+08:00"),
+    });
+
+    expect(activeHtml).toContain("roll-call-student-card is-present is-in-session");
+    expect(completedHtml).toContain('class="student-card roll-call-student-card is-present"');
+    expect(completedHtml).not.toContain("is-in-session");
+  });
+
+  test("九十分鐘以到班時間計算，尚未到班與無效舊資料不顯示紫色", () => {
+    const record = { dateKey: "2026-07-27", arrivalTime: "15:12" };
+
+    expect(getAttendanceSessionTimes(record)).toEqual({
+      startAt: Date.parse("2026-07-27T15:12:00+08:00"),
+      endAt: Date.parse("2026-07-27T16:42:00+08:00"),
+    });
+    expect(isAttendanceInActiveWindow(record, new Date("2026-07-27T15:11:59+08:00"))).toBe(false);
+    expect(isAttendanceInActiveWindow(record, new Date("2026-07-27T15:12:00+08:00"))).toBe(true);
+    expect(isAttendanceInActiveWindow({ dateKey: "2026-07-27", arrivalTime: "" }, new Date())).toBe(false);
+  });
+
+  test("自動更新只等待最近一位上課中學生滿九十分鐘", () => {
+    const now = new Date("2026-07-27T16:00:00+08:00");
+    const delay = getNextAttendanceStatusChangeDelay([
+      { dateKey: "2026-07-27", arrivalTime: "14:00" },
+      { dateKey: "2026-07-27", arrivalTime: "15:00" },
+      { dateKey: "2026-07-27", arrivalTime: "15:20" },
+      { dateKey: "2026-07-27", arrivalTime: "17:00" },
+    ], now);
+
+    expect(delay).toBe(30 * 60 * 1000);
+  });
+
+  test("頁面停留在今日點名時會在滿九十分鐘後自動更新", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-27T16:00:00+08:00"));
+    const refresh = vi.fn();
+    const app = {
+      querySelector: () => null,
+      querySelectorAll: () => [],
+    };
+
+    bindRollCall(app, {
+      ...state,
+      attendance: [{
+        studentId: "student-1",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+        arrivalTime: "15:00",
+      }],
+    }, refresh, vi.fn());
+
+    vi.advanceTimersByTime(30 * 60 * 1000);
+    expect(refresh).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(50);
+    expect(refresh).toHaveBeenCalledWith(true);
   });
 
   test("同一時段先顯示已點名學生並依建立時間由早到晚，其後為未點名與請假", () => {

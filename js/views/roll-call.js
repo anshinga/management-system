@@ -40,6 +40,68 @@ function displayDate(date) {
   return `${year} 年 ${Number(month)} 月 ${Number(day)} 日`;
 }
 
+function timestampToMillis(value) {
+  if (typeof value?.toMillis === "function") {
+    const millis = value.toMillis();
+    return Number.isFinite(millis) ? millis : null;
+  }
+  if (Number.isFinite(value?.seconds)) {
+    return (value.seconds * 1000) + (Number(value.nanoseconds || 0) / 1_000_000);
+  }
+  if (value instanceof Date) {
+    const millis = value.getTime();
+    return Number.isFinite(millis) ? millis : null;
+  }
+  return null;
+}
+
+function compareFallbackArrivalTime(a, b) {
+  const aTime = typeof a.record?.arrivalTime === "string" ? a.record.arrivalTime : "";
+  const bTime = typeof b.record?.arrivalTime === "string" ? b.record.arrivalTime : "";
+  if (aTime && bTime && aTime !== bTime) return aTime.localeCompare(bTime);
+  if (aTime && !bTime) return -1;
+  if (!aTime && bTime) return 1;
+  return a.index - b.index;
+}
+
+export function sortRollCallStudentIds(
+  studentIds,
+  { attendance = [], leaveRecords = [], dateKey, slot },
+) {
+  const attendanceByStudentId = new Map(attendance
+    .filter((record) => record.dateKey === dateKey && record.slot === slot)
+    .map((record) => [record.studentId, record]));
+  const leaveStudentIds = new Set(leaveRecords
+    .filter((record) => record.dateKey === dateKey && record.slot === slot)
+    .map((record) => record.studentId));
+
+  const sortableStudents = studentIds.map((studentId, index) => {
+    const record = attendanceByStudentId.get(studentId);
+    return {
+      studentId,
+      index,
+      record,
+      createdAtMillis: timestampToMillis(record?.createdAt),
+      priority: record ? 0 : leaveStudentIds.has(studentId) ? 2 : 1,
+    };
+  });
+  const allAttendanceHasTimestamps = sortableStudents
+    .filter((item) => item.priority === 0)
+    .every((item) => item.createdAtMillis !== null);
+
+  return sortableStudents
+    .sort((a, b) => {
+      if (a.priority !== b.priority) return a.priority - b.priority;
+      if (a.priority !== 0) return a.index - b.index;
+
+      if (allAttendanceHasTimestamps && a.createdAtMillis !== b.createdAtMillis) {
+        return a.createdAtMillis - b.createdAtMillis;
+      }
+      return compareFallbackArrivalTime(a, b);
+    })
+    .map(({ studentId }) => studentId);
+}
+
 export function renderRollCall(state, refresh) {
   const date = getSelectedAttendanceDate();
   const dateObject = parseDate(date);
@@ -105,7 +167,13 @@ export function renderRollCall(state, refresh) {
 function renderClass(state, date, slot, schedule, seasonId) {
   const temporaryStudentIds = new Set(schedule.temporaryStudentIds || []);
   const resolvedSeasonId = seasonId || schedule.season || "";
-  return `<section class="class-section"><div class="class-heading"><h3>${slot}</h3><span>${schedule.studentIds.length} 人</span></div><div class="class-students roll-call-drop-zone" data-roll-call-drop-slot="${escapeAttribute(slot)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-season="${escapeAttribute(resolvedSeasonId)}">${schedule.studentIds.map((id) => renderStudent(state, date, slot, id, {
+  const orderedStudentIds = sortRollCallStudentIds(schedule.studentIds, {
+    attendance: state.attendance,
+    leaveRecords: state.leaveRecords || [],
+    dateKey: date,
+    slot,
+  });
+  return `<section class="class-section"><div class="class-heading"><h3>${slot}</h3><span>${schedule.studentIds.length} 人</span></div><div class="class-students roll-call-drop-zone" data-roll-call-drop-slot="${escapeAttribute(slot)}" data-roll-call-date="${escapeAttribute(date)}" data-roll-call-season="${escapeAttribute(resolvedSeasonId)}">${orderedStudentIds.map((id) => renderStudent(state, date, slot, id, {
     seasonId: resolvedSeasonId,
     isTemporary: temporaryStudentIds.has(id),
   })).join("")}${renderTemporaryStudentCard(slot)}</div></section>`;

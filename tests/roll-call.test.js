@@ -24,6 +24,7 @@ const {
   renderRollCall,
   renderTemporaryStudentOption,
   shouldAutoFocusTemporaryStudentSearch,
+  sortRollCallStudentIds,
 } = await import("../js/views/roll-call.js");
 
 const state = {
@@ -114,6 +115,102 @@ describe("roll-call view", () => {
     expect(html).toContain(">18:00<");
     expect(html).toContain(">19:30<");
     expect(html).toContain("只加入本日，不會立即點名");
+  });
+
+  test("同一時段先顯示已點名學生並依建立時間由早到晚，其後為未點名與請假", () => {
+    const html = renderRollCall({
+      ...state,
+      students: [
+        { id: "pending", name: "尚未到班", grade: 5, status: "active", currentLessonCount: 4 },
+        { id: "late", name: "較晚到班", grade: 5, status: "active", currentLessonCount: 6 },
+        { id: "leave", name: "已經請假", grade: 5, status: "active", currentLessonCount: 8 },
+        { id: "early", name: "較早到班", grade: 5, status: "active", currentLessonCount: 10 },
+      ],
+      schedules: [{
+        id: "summer-2026-2026-07-27-15:00",
+        season: "summer-2026",
+        date: "2026-07-27",
+        slot: "15:00",
+        studentIds: ["pending", "late", "leave", "early"],
+      }],
+      attendance: [
+        {
+          id: "2026-07-27__15%3A00__late",
+          studentId: "late",
+          dateKey: "2026-07-27",
+          slot: "15:00",
+          arrivalTime: "14:55",
+          lessonNumber: 6,
+          createdAt: { seconds: 200, nanoseconds: 0 },
+        },
+        {
+          id: "2026-07-27__15%3A00__early",
+          studentId: "early",
+          dateKey: "2026-07-27",
+          slot: "15:00",
+          arrivalTime: "15:10",
+          lessonNumber: 10,
+          createdAt: { seconds: 100, nanoseconds: 0 },
+        },
+      ],
+      leaveRecords: [{
+        id: "2026-07-27__15%3A00__leave",
+        studentId: "leave",
+        dateKey: "2026-07-27",
+        slot: "15:00",
+      }],
+    });
+
+    expect(html.indexOf("較早到班")).toBeLessThan(html.indexOf("較晚到班"));
+    expect(html.indexOf("較晚到班")).toBeLessThan(html.indexOf("尚未到班"));
+    expect(html.indexOf("尚未到班")).toBeLessThan(html.indexOf("已經請假"));
+    expect(html.indexOf("已經請假")).toBeLessThan(html.indexOf("新增臨時學生"));
+  });
+
+  test("修改到班時間不改變時間戳記順序", () => {
+    const ordered = sortRollCallStudentIds(["late", "early"], {
+      dateKey: "2026-07-27",
+      slot: "15:00",
+      attendance: [
+        {
+          studentId: "late",
+          dateKey: "2026-07-27",
+          slot: "15:00",
+          arrivalTime: "14:00",
+          createdAt: { seconds: 200, nanoseconds: 0 },
+        },
+        {
+          studentId: "early",
+          dateKey: "2026-07-27",
+          slot: "15:00",
+          arrivalTime: "17:00",
+          createdAt: { seconds: 100, nanoseconds: 0 },
+        },
+      ],
+    });
+
+    expect(ordered).toEqual(["early", "late"]);
+  });
+
+  test("舊點名缺少建立時間戳記時以到班時間與原排課順序排序", () => {
+    const ordered = sortRollCallStudentIds(["same-time-first", "late", "early", "same-time-second"], {
+      dateKey: "2026-07-27",
+      slot: "15:00",
+      attendance: [
+        { studentId: "same-time-first", dateKey: "2026-07-27", slot: "15:00", arrivalTime: "15:10" },
+        {
+          studentId: "late",
+          dateKey: "2026-07-27",
+          slot: "15:00",
+          arrivalTime: "15:20",
+          createdAt: { seconds: 50, nanoseconds: 0 },
+        },
+        { studentId: "early", dateKey: "2026-07-27", slot: "15:00", arrivalTime: "15:05" },
+        { studentId: "same-time-second", dateKey: "2026-07-27", slot: "15:00", arrivalTime: "15:10" },
+      ],
+    });
+
+    expect(ordered).toEqual(["early", "same-time-first", "same-time-second", "late"]);
   });
 
   test("停課學生即使保留排課也不會出現在點名畫面", () => {

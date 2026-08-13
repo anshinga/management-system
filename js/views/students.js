@@ -1,4 +1,5 @@
 import { createStudent, updateStudent, updateStudentNote } from "../repositories/students-repository.js";
+import { getStudentAttendanceHistory } from "../repositories/attendance-repository.js";
 import { resolvePreviousLessonFields } from "../domain/records.js";
 import { getStudent, getTodayDate } from "../store.js";
 import { escapeAttribute, escapeHtml } from "../ui/html.js";
@@ -7,6 +8,18 @@ import { getUserErrorMessage } from "../ui/errors.js";
 const defaultGrades = Array.from({ length: 12 }, (_, index) => index + 1);
 const defaultSort = "grade";
 const NOTE_PREVIEW_LENGTH = 60;
+
+function needsLegacyAttendanceHistory(student, input) {
+  if (!student?.id || !input.previousLessonDate) return false;
+  if (input.previousLessonDate !== String(student.previousLessonDate || "")) return false;
+  const term = Number(student.previousLessonTerm);
+  const lessonNumber = Number(student.previousLessonNumber);
+  return !Number.isInteger(term)
+    || term < 1
+    || !Number.isInteger(lessonNumber)
+    || lessonNumber < 1
+    || lessonNumber > 24;
+}
 
 function summarizeNote(note) {
   const normalizedNote = typeof note === "string" ? note.trim() : "";
@@ -139,9 +152,12 @@ function showStudentForm(app, state, refresh, showToast, student = null) {
       } else if (!hasStudentFieldChanges && noteChanged) {
         await updateStudentNote(student.id, baseInput.note);
       } else {
+        const attendance = needsLegacyAttendanceHistory(student, baseInput)
+          ? await getStudentAttendanceHistory(student.id)
+          : state.attendance;
         await updateStudent(student.id, {
           ...baseInput,
-          ...resolvePreviousLessonFields(student, baseInput, state.attendance),
+          ...resolvePreviousLessonFields(student, baseInput, attendance),
         });
       }
       closeModal();

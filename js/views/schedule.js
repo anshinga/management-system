@@ -35,6 +35,20 @@ let observedAttendanceDate = null;
 let lastEnsuredWeekKey = "";
 let scheduleEnsureQueue = Promise.resolve();
 
+export function getScheduleDataScope() {
+  const attendanceDate = getSelectedAttendanceDate();
+  const effectiveWeekStart = observedAttendanceDate === attendanceDate
+    ? getWeekStart(scheduleWeekStart)
+    : getWeekStart(parseDate(attendanceDate));
+  const startDate = formatDate(effectiveWeekStart);
+  return {
+    route: "schedule",
+    startDate,
+    endDate: formatDate(addDays(effectiveWeekStart, 6)),
+    weekStart: startDate,
+  };
+}
+
 function shortDate(date) { return `${date.getMonth() + 1}/${date.getDate()}`; }
 
 function fullDate(date) {

@@ -70,25 +70,40 @@ async function startManagementSystem(user) {
       import("./views/booking-campaigns.js"),
       import("./repositories/workspace-data-repository.js"),
       import("./repositories/workspace-repository.js"),
+      import("./store.js"),
     ]).then(([
       { initRouter },
       { renderRollCall, bindRollCall },
       { renderStudents, bindStudents },
-      { renderSchedule, bindSchedule },
+      { renderSchedule, bindSchedule, getScheduleDataScope },
       { renderRecords, bindRecords },
       { renderPayment, bindPayment },
       { renderExportBackup, bindExportBackup },
       { renderBookingCampaigns, bindBookingCampaigns },
       { subscribeToWorkspaceData },
       { ensureWorkspaceAccess, promoteStudentGradesIfNeeded },
+      { formatDate, getSelectedAttendanceDate, getWeekStart, parseDate },
     ]) => {
       const app = document.querySelector("#app");
       const storageStatus = document.querySelector("#storage-status");
       let state = null;
       let currentRoute = "roll-call";
-      let unsubscribeData = null;
+      let dataSubscription = null;
       let lastRenderedRevision = -1;
       let canManageBooking = false;
+
+      function getCurrentDataScope() {
+        if (currentRoute === "roll-call") {
+          const dateKey = getSelectedAttendanceDate();
+          return {
+            route: currentRoute,
+            dateKey,
+            weekStart: formatDate(getWeekStart(parseDate(dateKey))),
+          };
+        }
+        if (currentRoute === "schedule") return getScheduleDataScope();
+        return { route: currentRoute };
+      }
 
       function showToast(message) {
         const toast = document.querySelector("#toast");
@@ -111,6 +126,7 @@ async function startManagementSystem(user) {
       }
 
       function refresh(force = true) {
+        dataSubscription?.setScope(getCurrentDataScope());
         updateStorageStatus();
         if (!state?.sync?.ready) {
           app.innerHTML = '<div class="panel empty" aria-busy="true">正在載入雲端資料…</div>';
@@ -155,8 +171,8 @@ async function startManagementSystem(user) {
 
       return {
         async connect(authenticatedUser) {
-          unsubscribeData?.();
-          unsubscribeData = null;
+          dataSubscription?.unsubscribe();
+          dataSubscription = null;
           state = null;
           lastRenderedRevision = -1;
           refresh(true);
@@ -173,7 +189,7 @@ async function startManagementSystem(user) {
           await promoteStudentGradesIfNeeded(authenticatedUser);
           await new Promise((resolve, reject) => {
             let settled = false;
-            unsubscribeData = subscribeToWorkspaceData((nextState) => {
+            dataSubscription = subscribeToWorkspaceData((nextState) => {
               const shouldRender = state?.sync?.revision !== nextState.sync.revision;
               state = nextState;
               refresh(shouldRender);
@@ -189,12 +205,15 @@ async function startManagementSystem(user) {
               }
               storageStatus.textContent = "雲端同步失敗";
               showToast("雲端同步中斷，請檢查網路後重新整理");
-            }, { includeBooking: canManageBooking });
+            }, {
+              includeBooking: canManageBooking,
+              initialScope: getCurrentDataScope(),
+            });
           });
         },
         disconnect() {
-          unsubscribeData?.();
-          unsubscribeData = null;
+          dataSubscription?.unsubscribe();
+          dataSubscription = null;
           state = null;
           lastRenderedRevision = -1;
           storageStatus.textContent = "尚未連線";

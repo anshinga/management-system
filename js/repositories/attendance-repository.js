@@ -27,6 +27,18 @@ function leaveRecordReference(value) {
   return workspaceDocumentRef(COLLECTIONS.leaveRecords, makeAttendanceId(value));
 }
 
+export async function getStudentAttendanceHistory(studentId) {
+  if (!studentId) throw new Error("學生 ID 不可為空。");
+  const snapshot = await getDocs(query(
+    workspaceCollectionRef(COLLECTIONS.attendance),
+    where("studentId", "==", studentId),
+  ));
+  return snapshot.docs.map((document) => ({
+    id: document.id,
+    ...document.data(),
+  }));
+}
+
 export async function markAttendance({ studentId, dateKey, slot, arrivalTime }) {
   const user = requireCurrentUser();
   if (!isDateKey(dateKey) || !isTimeValue(slot) || !isTimeValue(arrivalTime)) {

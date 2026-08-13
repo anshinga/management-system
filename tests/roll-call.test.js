@@ -1,9 +1,17 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
-const moveScheduleEntryForDateMock = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
+const {
+  addTemporaryScheduleEntriesMock,
+  markAttendanceMock,
+  moveScheduleEntryForDateMock,
+} = vi.hoisted(() => ({
+  addTemporaryScheduleEntriesMock: vi.fn(),
+  markAttendanceMock: vi.fn(),
+  moveScheduleEntryForDateMock: vi.fn(() => Promise.resolve(true)),
+}));
 
 vi.mock("../js/repositories/attendance-repository.js", () => ({
-  markAttendance: vi.fn(),
+  markAttendance: markAttendanceMock,
   removeLatestAttendance: vi.fn(),
   updateAttendanceTime: vi.fn(),
 }));
@@ -14,7 +22,7 @@ vi.mock("../js/repositories/leave-repository.js", () => ({
 }));
 
 vi.mock("../js/repositories/schedule-repository.js", () => ({
-  addTemporaryScheduleEntries: vi.fn(),
+  addTemporaryScheduleEntries: addTemporaryScheduleEntriesMock,
   ensureScheduleWeek: vi.fn(() => Promise.resolve(false)),
   moveScheduleEntryForDate: moveScheduleEntryForDateMock,
 }));
@@ -23,11 +31,13 @@ const {
   bindRollCall,
   getAttendanceSessionTimes,
   getNextAttendanceStatusChangeDelay,
+  getTemporaryStudentSubmissionMode,
   isAttendanceInActiveWindow,
   renderRollCall,
   renderTemporaryStudentOption,
   shouldAutoFocusTemporaryStudentSearch,
   sortRollCallStudentIds,
+  submitTemporaryStudents,
 } = await import("../js/views/roll-call.js");
 
 const state = {
@@ -51,6 +61,8 @@ beforeEach(() => {
     getItem: (key) => values.get(key) || null,
     setItem: (key, value) => values.set(key, String(value)),
   });
+  addTemporaryScheduleEntriesMock.mockReset().mockResolvedValue(0);
+  markAttendanceMock.mockReset().mockResolvedValue(undefined);
   moveScheduleEntryForDateMock.mockClear();
 });
 
@@ -112,6 +124,77 @@ describe("roll-call view", () => {
     expect(shouldAutoFocusTemporaryStudentSearch({
       matchMedia: () => ({ matches: true }),
     })).toBe(true);
+  });
+
+  test("今天預設直接點名，歷史日期強制只新增", () => {
+    expect(getTemporaryStudentSubmissionMode("2026-08-13", "2026-08-13")).toEqual({
+      canDirectAttendance: true,
+      addOnly: false,
+    });
+    expect(getTemporaryStudentSubmissionMode("2026-08-12", "2026-08-13")).toEqual({
+      canDirectAttendance: false,
+      addOnly: true,
+    });
+  });
+
+  test("臨時學生直接點名會先加入排課，再以相同到班時間逐一點名", async () => {
+    addTemporaryScheduleEntriesMock.mockResolvedValue(2);
+
+    const result = await submitTemporaryStudents({
+      studentIds: ["student-1", "student-2"],
+      dateKey: "2026-08-13",
+      slot: "16:30",
+      seasonId: "summer-2026",
+      arrivalTime: "16:12",
+    });
+
+    expect(addTemporaryScheduleEntriesMock).toHaveBeenCalledWith(
+      ["student-1", "student-2"],
+      { dateKey: "2026-08-13", slot: "16:30", seasonId: "summer-2026" },
+    );
+    expect(markAttendanceMock).toHaveBeenCalledTimes(2);
+    expect(markAttendanceMock).toHaveBeenNthCalledWith(1, {
+      studentId: "student-1",
+      dateKey: "2026-08-13",
+      slot: "16:30",
+      arrivalTime: "16:12",
+    });
+    expect(markAttendanceMock).toHaveBeenNthCalledWith(2, {
+      studentId: "student-2",
+      dateKey: "2026-08-13",
+      slot: "16:30",
+      arrivalTime: "16:12",
+    });
+    expect(result).toEqual({ addedCount: 2, attendedCount: 2, failedStudentIds: [] });
+  });
+
+  test("只新增模式不點名，個別點名失敗時回報失敗學生", async () => {
+    addTemporaryScheduleEntriesMock.mockResolvedValue(2);
+    const addOnlyResult = await submitTemporaryStudents({
+      studentIds: ["student-1", "student-2"],
+      dateKey: "2026-08-13",
+      slot: "16:30",
+      seasonId: "summer-2026",
+      addOnly: true,
+    });
+    expect(markAttendanceMock).not.toHaveBeenCalled();
+    expect(addOnlyResult).toEqual({ addedCount: 2, attendedCount: 0, failedStudentIds: [] });
+
+    markAttendanceMock
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("點名失敗"));
+    const partialResult = await submitTemporaryStudents({
+      studentIds: ["student-1", "student-2"],
+      dateKey: "2026-08-13",
+      slot: "16:30",
+      seasonId: "summer-2026",
+      arrivalTime: "16:12",
+    });
+    expect(partialResult).toEqual({
+      addedCount: 2,
+      attendedCount: 1,
+      failedStudentIds: ["student-2"],
+    });
   });
 
   test("四個時段都顯示臨時加入學生的方塊", () => {

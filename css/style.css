@@ -542,6 +542,11 @@ textarea.input { resize: vertical; }
 .temporary-student-option strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .temporary-student-option small { color: var(--muted); font-size: 11px; }
 .temporary-student-selection { color: var(--muted); font-size: 13px; }
+.temporary-student-submit-options { align-items: center; display: flex; gap: 12px; justify-content: space-between; }
+.temporary-add-only-toggle { background: var(--surface); border: 1px solid var(--line); border-radius: 7px; color: var(--muted); font-size: 13px; padding: 7px 10px; }
+.temporary-add-only-toggle:hover:not(:disabled) { border-color: var(--gold); color: var(--gold-dark); }
+.temporary-add-only-toggle[aria-pressed="true"] { background: var(--gold-soft); border-color: var(--gold); color: var(--gold-dark); }
+.temporary-add-only-toggle:disabled { cursor: default; opacity: .75; }
 .schedule-student-picker-list { max-height: 320px; overflow-y: auto; padding-right: 4px; }
 .schedule-student-picker-option { cursor: pointer; min-width: 0; }
 .schedule-student-picker-option[hidden],
@@ -720,6 +725,8 @@ body.dark .student-status-select.paused { background-color: #3a3b36; border-colo
   .temporary-student-option small { font-size: 12px; white-space: nowrap; }
   .temporary-student-option .temporary-student-lesson { display: none; }
   .temporary-student-selection { font-size: 15px; }
+  .temporary-student-submit-options { align-items: stretch; flex-direction: column; gap: 7px; }
+  .temporary-add-only-toggle { align-self: flex-start; font-size: 13px; }
   .week-toolbar { flex-wrap: wrap; }
   .schedule-page-head { align-items: center; flex-direction: row; }
   .schedule-title-row { flex: 1; gap: 12px; }

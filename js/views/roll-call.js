@@ -231,6 +231,51 @@ export function shouldAutoFocusTemporaryStudentSearch(viewport = globalThis) {
   return viewport.matchMedia?.("(min-width: 721px)")?.matches === true;
 }
 
+export function getTemporaryStudentSubmissionMode(dateKey, todayDate = getTodayDate()) {
+  const canDirectAttendance = dateKey === todayDate;
+  return {
+    canDirectAttendance,
+    addOnly: !canDirectAttendance,
+  };
+}
+
+export async function submitTemporaryStudents({
+  studentIds,
+  dateKey,
+  slot,
+  seasonId,
+  addOnly = false,
+  arrivalTime = getTime(),
+}, {
+  addEntries = addTemporaryScheduleEntries,
+  attend = markAttendance,
+} = {}) {
+  const addedCount = await addEntries(studentIds, { dateKey, slot, seasonId });
+  if (addOnly) {
+    return {
+      addedCount,
+      attendedCount: 0,
+      failedStudentIds: [],
+    };
+  }
+
+  const attendanceResults = await Promise.allSettled(studentIds.map((studentId) => attend({
+    studentId,
+    dateKey,
+    slot,
+    arrivalTime,
+  })));
+  const failedStudentIds = attendanceResults
+    .map((result, index) => (result.status === "rejected" ? studentIds[index] : ""))
+    .filter(Boolean);
+
+  return {
+    addedCount,
+    attendedCount: studentIds.length - failedStudentIds.length,
+    failedStudentIds,
+  };
+}
+
 function renderStudent(state, date, slot, id, { seasonId, isTemporary, now }) {
   const student = getStudent(state, id);
   const record = state.attendance.find((item) => item.studentId === id && item.dateKey === date && item.slot === slot);
@@ -271,11 +316,13 @@ function openTemporaryStudentModal(app, state, {
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
   const modal = document.createElement("section");
+  const initialMode = getTemporaryStudentSubmissionMode(dateKey);
+  let addOnly = initialMode.addOnly;
   modal.className = "modal";
   modal.setAttribute("role", "dialog");
   modal.setAttribute("aria-modal", "true");
   modal.setAttribute("aria-labelledby", "temporary-student-title");
-  modal.innerHTML = `<form class="modal-form" data-temporary-student-form><div class="modal-head"><div><h3 id="temporary-student-title">新增臨時學生</h3><p class="student-subtitle">${escapeHtml(`${dateKey}・${slot}`)}，只新增排課，不會立即點名。</p></div><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="field"><label for="temporary-student-search">搜尋學生</label><input class="input" id="temporary-student-search" type="search" autocomplete="off" placeholder="輸入學生姓名" /></div><div class="checkbox-list temporary-student-list" data-temporary-student-list>${availableStudents.map(renderTemporaryStudentOption).join("")}</div><p class="panel empty temporary-student-empty" data-temporary-student-empty ${availableStudents.length ? "hidden" : ""}>沒有可加入的學生。</p><div class="temporary-student-selection" data-temporary-student-selection>已選取 0 位</div><div class="form-actions"><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit" disabled>加入學生</button></div></form>`;
+  modal.innerHTML = `<form class="modal-form" data-temporary-student-form><div class="modal-head"><div><h3 id="temporary-student-title">新增臨時學生</h3><p class="student-subtitle" data-temporary-mode-description></p></div><button class="modal-close" type="button" data-close-modal>關閉</button></div><div class="field"><label for="temporary-student-search">搜尋學生</label><input class="input" id="temporary-student-search" type="search" autocomplete="off" placeholder="輸入學生姓名" /></div><div class="checkbox-list temporary-student-list" data-temporary-student-list>${availableStudents.map(renderTemporaryStudentOption).join("")}</div><p class="panel empty temporary-student-empty" data-temporary-student-empty ${availableStudents.length ? "hidden" : ""}>沒有可加入的學生。</p><div class="temporary-student-submit-options"><div class="temporary-student-selection" data-temporary-student-selection>已選取 0 位</div><button class="temporary-add-only-toggle" data-action="toggle-add-only" type="button" aria-pressed="${addOnly}"${initialMode.canDirectAttendance ? "" : " disabled"}></button></div><div class="form-actions"><button class="button-secondary" type="button" data-cancel>取消</button><button class="button-primary" type="submit" disabled></button></div></form>`;
   backdrop.append(modal);
   app.append(backdrop);
 
@@ -284,8 +331,22 @@ function openTemporaryStudentModal(app, state, {
   const options = [...modal.querySelectorAll(".temporary-student-option")];
   const empty = modal.querySelector("[data-temporary-student-empty]");
   const selection = modal.querySelector("[data-temporary-student-selection]");
+  const modeDescription = modal.querySelector("[data-temporary-mode-description]");
+  const addOnlyToggle = modal.querySelector('[data-action="toggle-add-only"]');
   const submitButton = form.querySelector('[type="submit"]');
   const close = () => closeAttendanceModal(backdrop);
+  const updateMode = () => {
+    addOnlyToggle.setAttribute("aria-pressed", String(addOnly));
+    addOnlyToggle.textContent = initialMode.canDirectAttendance
+      ? addOnly ? "只新增模式：開啟" : "只新增，不點名"
+      : "歷史日期僅新增";
+    modeDescription.textContent = initialMode.canDirectAttendance
+      ? addOnly
+        ? `${dateKey}・${slot}，只新增排課，不會立即點名。`
+        : `${dateKey}・${slot}，會以目前時間直接點名。`
+      : `${dateKey}・${slot}，歷史日期只新增排課，不會立即點名。`;
+    submitButton.textContent = addOnly ? "只加入學生" : "加入並點名";
+  };
   const updateSelection = () => {
     const selectedCount = form.querySelectorAll('input[name="studentIds"]:checked').length;
     selection.textContent = `已選取 ${selectedCount} 位`;
@@ -294,6 +355,11 @@ function openTemporaryStudentModal(app, state, {
 
   modal.querySelector("[data-close-modal]").addEventListener("click", close);
   modal.querySelector("[data-cancel]").addEventListener("click", close);
+  addOnlyToggle.addEventListener("click", () => {
+    if (!initialMode.canDirectAttendance) return;
+    addOnly = !addOnly;
+    updateMode();
+  });
   modal.addEventListener("keydown", (event) => {
     if (event.key === "Escape") close();
   });
@@ -318,18 +384,28 @@ function openTemporaryStudentModal(app, state, {
     if (!studentIds.length) return;
     submitButton.disabled = true;
     try {
-      const addedCount = await addTemporaryScheduleEntries(studentIds, {
+      const result = await submitTemporaryStudents({
+        studentIds,
         dateKey,
         slot,
         seasonId,
+        addOnly,
+        arrivalTime: getTime(),
       });
       close();
-      showToast(`已加入 ${addedCount} 位臨時學生，尚未點名`);
+      if (addOnly) {
+        showToast(`已加入 ${result.addedCount} 位臨時學生，尚未點名`);
+      } else if (result.failedStudentIds.length) {
+        showToast(`已點名 ${result.attendedCount} 位，${result.failedStudentIds.length} 位僅加入，請手動確認`);
+      } else {
+        showToast(`已加入 ${result.addedCount} 位臨時學生並完成點名`);
+      }
     } catch (error) {
       submitButton.disabled = false;
       showToast(getUserErrorMessage(error, "臨時學生加入失敗"));
     }
   });
+  updateMode();
   if (shouldAutoFocusTemporaryStudentSearch()) search.focus();
 }
 

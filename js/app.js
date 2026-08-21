@@ -65,6 +65,7 @@ async function startManagementSystem(user) {
       import("./views/roll-call.js"),
       import("./views/students.js"),
       import("./views/schedule.js"),
+      import("./views/analytics.js"),
       import("./views/records.js"),
       import("./views/payment.js"),
       import("./views/export-backup.js"),
@@ -77,6 +78,7 @@ async function startManagementSystem(user) {
       { renderRollCall, bindRollCall },
       { renderStudents, bindStudents },
       { renderSchedule, bindSchedule, getScheduleDataScope },
+      { renderAnalytics, bindAnalytics, resetAnalyticsView },
       { renderRecords, bindRecords },
       { renderPayment, bindPayment },
       { renderExportBackup, bindExportBackup },
@@ -104,6 +106,7 @@ async function startManagementSystem(user) {
         "roll-call",
         "students",
         "schedule",
+        "analytics",
         "records",
         "payment",
         "export-backup",
@@ -158,16 +161,19 @@ async function startManagementSystem(user) {
             ? renderStudents(state)
             : currentRoute === "schedule"
               ? renderSchedule(state)
-              : currentRoute === "records"
-                ? renderRecords(state)
-                : currentRoute === "payment"
-                  ? renderPayment(state)
-                  : currentRoute === "export-backup"
-                    ? renderExportBackup(state)
-                    : renderBookingCampaigns(state);
+              : currentRoute === "analytics"
+                ? renderAnalytics(state)
+                : currentRoute === "records"
+                  ? renderRecords(state)
+                  : currentRoute === "payment"
+                    ? renderPayment(state)
+                    : currentRoute === "export-backup"
+                      ? renderExportBackup(state)
+                      : renderBookingCampaigns(state);
         if (currentRoute === "roll-call") bindRollCall(app, state, refresh, showToast);
         if (currentRoute === "students") bindStudents(app, state, refresh, showToast);
         if (currentRoute === "schedule") bindSchedule(app, state, refresh, showToast);
+        if (currentRoute === "analytics") bindAnalytics(app, refresh);
         if (currentRoute === "records") bindRecords(app, state);
         if (currentRoute === "payment") bindPayment(app, state, refresh, showToast);
         if (currentRoute === "export-backup") bindExportBackup(app, state, refresh, showToast);
@@ -209,6 +215,7 @@ async function startManagementSystem(user) {
 
       return {
         async connect(authenticatedUser) {
+          resetAnalyticsView();
           dataSubscription?.unsubscribe();
           dataSubscription = null;
           state = null;
@@ -250,6 +257,7 @@ async function startManagementSystem(user) {
           });
         },
         disconnect() {
+          resetAnalyticsView();
           dataSubscription?.unsubscribe();
           dataSubscription = null;
           state = null;

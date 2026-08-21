@@ -93,6 +93,10 @@ function routeSubscriptions(scope, includeBooking) {
     ];
   }
 
+  if (scope.route === "analytics") {
+    return [];
+  }
+
   if (scope.route === "records") {
     return [{
       name: COLLECTIONS.attendance,

@@ -1,8 +1,8 @@
 # 安信佳點名系統：專案進度與交接
 
 > 最後更新：2026-08-21
-> 更新時的分支：`codex/daily-roll-call-reset`
-> 更新時的 Git HEAD：`0f77dcf`（依路由縮小 Firestore 即時訂閱範圍）
+> 更新時的分支：`codex/attendance-analytics`
+> 更新時的 Git HEAD：`cbebad2`（每日跨日回到今日點名）
 
 這份文件提供給後續的新對話或開發者快速接手。開始修改前，仍必須先完整閱讀 `AGENTS.md`，並以使用者最新指示為準。
 
@@ -23,13 +23,14 @@
 
 ## 目前檢查點
 
-- `main` 與 `origin/main` 目前同為 `0f77dcf`，盤點時工作區乾淨。
+- `main` 與 `origin/main` 目前同為 `cbebad2`；本功能在 `codex/attendance-analytics` 分支實作。
 - 「最新第 24 堂可安全跨期撤銷」已包含在 `eda8a38`；請假功能已包含在 `ba2a861`。
 - 後續完成了點名依時間戳排序（`edfb6fa`）、點名後 90 分鐘紫色狀態（`8bcb03f`）、臨時學生預設直接點名（`aaa02de`），以及依路由縮小 Firestore 訂閱範圍（`0f77dcf`）。
 - 本分支新增每日跨日回到今日點名：同一天保留目前頁面；隔天載入或從背景恢復時，以台北日期切回「今日點名」並更新 Firestore 訂閱範圍。
-- 2026-08-21 一般測試結果：`23` 個測試檔、`147` 項測試全部通過。
+- 本分支新增「數據統計與分析」：頁面開啟時不讀取歷史點名，按下分析後才查詢最近 4、8 或 13 週，並只統計目前在讀學生的每週與各時段人次。
+- 2026-08-21 一般測試結果：`26` 個測試檔、`159` 項測試全部通過。
 - 2026-08-21 因執行環境缺少 Java，未重新執行 Firestore Emulator／Security Rules 測試；不可把一般測試通過視為 Rules 已驗證。
-- 2026-08-21 本機瀏覽器已確認登入入口正常載入且 Console 沒有錯誤；沒有已授權 Google 帳號，因此未重新驗證受保護管理頁面。
+- 2026-08-21 本機瀏覽器已確認登入入口正常載入；另以正式 view 與 CSS 的本機預覽檢查數據統計桌面版、390px 手機版及 Console，皆無錯誤。沒有已授權 Google 帳號，因此未重新驗證登入後的 Firestore 整合流程。
 - Word 備份已實際產生同日後續時段補位範例，並以 Microsoft Word 渲染確認維持單一 A4 橫式頁；真正超過整日容量的情況仍有續頁測試。
 - 課程紀錄 Word 已以 60 位學生、16 堂續列與六字長姓名實際產生並逐頁檢查；輸出維持 A4 橫式 3 頁，沒有截斷或額外空白頁。
 
@@ -42,6 +43,7 @@
 - 每週排課
 - 點名紀錄
 - 繳費管理
+- 數據統計與分析
 - 匯出紙本備份
 - 家長／學生選課活動
 
@@ -53,7 +55,7 @@
 - `booking.html` 是家長／學生的專屬選課入口。
 - Firebase Authentication 使用 Google 登入。
 - Cloud Firestore 保存正式業務資料並提供即時同步。
-- Firestore 即時訂閱依目前路由切換範圍：今日點名只讀所選日期、排課只讀目前週次；紀錄與匯出備份才讀取所需的完整歷史資料。
+- Firestore 即時訂閱依目前路由切換範圍：今日點名只讀所選日期、排課只讀目前週次；數據分析進頁時不讀歷史點名，只有按下分析才執行最多 13 週的單次查詢；紀錄與匯出備份才讀取所需的完整歷史資料。
 - Cloud Functions 位於 `functions/`，處理公開選課與可信任的交易操作。
 - `localStorage` 只保存深色模式、目前選取的點名日期與最後使用日期，不保存學生、排課或點名等業務資料。
 
@@ -78,6 +80,7 @@
 - `js/domain/records-backup.js`：唯讀推導雙月課程紀錄、前期銜接堂次、在讀學生排序與每 15 堂續列。
 - `js/domain/records.js`：紀錄期間與舊資料起點。
 - `js/domain/booking.js`：選課活動輸入、時段鍵值與驗證。
+- `js/domain/analytics.js`：分析週期上限、每週分組、在讀學生過濾與時段人次推導。
 
 ### Repository
 
@@ -87,6 +90,7 @@
 - `js/repositories/leave-repository.js`
 - `js/repositories/payments-repository.js`
 - `js/repositories/booking-repository.js`
+- `js/repositories/analytics-repository.js`
 - `js/repositories/workspace-data-repository.js`
 - `js/repositories/workspace-repository.js`
 - `js/repositories/firestore-paths.js`
@@ -98,6 +102,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 - `js/views/roll-call.js`：今日／歷史日期點名。
 - `js/views/students.js`：學生管理與編輯視窗。
 - `js/views/schedule.js`：排課頁。
+- `js/views/analytics.js`：按需讀取並顯示每週、時段與明細人次。
 - `js/views/records.js`：歷史紀錄與資料夾。
 - `js/views/payment.js`：繳費頁。
 - `js/views/export-backup.js`：手動 Word／列印備份頁。
@@ -247,6 +252,16 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 - 上下學期的週六區塊寬度目前為 `150px`。
 - 平日學生姓名仍採兩兩並列，姓名保持單行。
 
+### 數據統計與分析
+
+- 頁面預設最近 8 週，另可選最近 4 或 13 週；每週從星期一開始，目前週標示為「進行中」。
+- 只統計目前狀態為 `active` 的學生與實際 `attendance`；停課學生、請假及未到班資料不納入。
+- 顯示每週總人次長條圖、所選期間各時段總人次，以及「週次 × 時段」明細表；不顯示平均週人次或個別學生分析。
+- 進入 analytics 路由時不訂閱歷史點名，只保留學生、時期與繳費提醒等既有基礎訂閱。
+- 使用者按下「開始分析」後，才以 `dateKey` 上下限執行一次性 Firestore 查詢；repository 再次驗證單次最多 13 週。
+- 相同日期範圍在本次登入期間使用記憶體快取；按下「重新分析」才重新讀取，登出或重新連線會清除快取。
+- owner、teacher、viewer 都沿用既有 `attendance` 讀取權限，不需要新增 Rules、Indexes 或 Cloud Functions。
+
 ### 紀錄
 
 - 紀錄頁顯示每位學生目前雙月區間與此前最後一筆紀錄。
@@ -313,6 +328,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
 7. Firestore 資料結構或全面遷移必須先取得使用者確認。
 8. 不可用前端 email 比對或按鈕隱藏取代真正的 Security Rules。
 9. 匯出備份必須保持唯讀，不可為了產生文件而補寫或改動排課資料。
+10. 數據分析頁不可在進頁時訂閱歷史點名，也不可移除 repository 的 13 週查詢上限。
 
 ## 響應式介面狀態
 
@@ -322,6 +338,7 @@ Repository 負責 Firestore 讀寫；View 不應直接散落 Firestore 寫入邏
   - 今日點名
   - 學生管理
   - 排課（手機單日模式；桌面仍為週模式）
+- 數據分析在手機版會把控制列改為單欄、時段卡改為兩欄；週人次圖與明細表保留橫向捲動，避免壓縮數字。
 - 匯出備份已驗證桌面預覽與手機單欄預覽；課程紀錄在手機版會把姓名與日期改為上下排列，避免水平溢位。
 - 其他頁面的手機版仍以既有共用樣式為主。若後續要重新設計，應逐頁與使用者確認，且不要影響桌面版。
 
@@ -349,9 +366,9 @@ Rules 測試會啟動本機 Firestore Emulator，不應寫入正式資料庫。
 
 2026-08-21 驗證狀態：
 
-- 一般測試：`23` 個測試檔、`147` 項全部通過。
+- 一般測試：`26` 個測試檔、`159` 項全部通過。
 - Firestore Rules 測試：執行環境缺少 Java，本次未執行。
-- 瀏覽器：登入入口正常載入且 Console 沒有錯誤；沒有已授權 Google 帳號，本次未重新檢查受保護頁面的完整視覺行為。
+- 瀏覽器：登入入口正常載入；數據統計正式 view 已以桌面版與 390px 手機版預覽檢查，Console 沒有錯誤。沒有已授權 Google 帳號，本次未重新檢查登入後的 Firestore 整合流程。
 
 每次修改後至少檢查：
 
@@ -416,6 +433,7 @@ git show <commit>
 - 時期類型目前依 `season.id` 或 `season.name` 中的 `summer`、`fall`、`winter`、`spring`／中文名稱判斷。若未來允許任意命名，應改成明確的 `type` 欄位並規劃相容遷移。
 - 選課活動開放後，人工更動同一活動日期與時段的排課，可能造成容量計數與實際排課不同；需要調整時應先提前截止活動。
 - 紀錄頁與匯出備份仍需要讀取完整歷史點名或排課資料；資料量持續成長時，應監控 Firestore 讀取成本與初次載入時間。
+- 數據分析的日期查詢會讀取範圍內全部點名文件，再以目前學生狀態排除停課學生；停課紀錄不會顯示，但仍可能計入本次 Firestore 讀取筆數。
 - 選課的 domain 與管理畫面已有自動測試，但 `functions/index.js` callable functions 的完整 Emulator 交易流程目前沒有整合測試。
 - 正式管理頁的完整視覺驗證需要已授權 Google 帳號。沒有登入狀態時，不可宣稱已手動檢查所有受保護頁面。
 - 後續修改必須遵守 `AGENTS.md`：不可直接在 `main` 修改，應建立單一用途分支；遇到分支不明、衝突或異常大量變更時停止並回報。

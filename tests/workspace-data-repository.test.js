@@ -163,6 +163,24 @@ describe("workspace data repository", () => {
     expect(states.at(-1).attendance).toEqual([]);
   });
 
+  test("數據分析頁只訂閱基礎資料，不會自動讀取歷史點名", () => {
+    const states = [];
+    subscribeToWorkspaceData(
+      (state) => states.push(state),
+      vi.fn(),
+      { initialScope: { route: "analytics" } },
+    );
+
+    expect([...snapshotHandlers.keys()].sort()).toEqual([
+      "billingCycles",
+      "seasons",
+      "students",
+    ]);
+    expect(snapshotHandlers.has("attendance")).toBe(false);
+    resolveSnapshots(["students", "seasons", "billingCycles"]);
+    expect(states.at(-1).sync.ready).toBe(true);
+  });
+
   test("選課集合只在選課頁訂閱，權限錯誤不會阻斷核心資料", () => {
     const states = [];
     const fatalError = vi.fn();

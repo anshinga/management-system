@@ -40,3 +40,12 @@ describe("網站品牌圖示", () => {
     expect(existsSync(`${projectPath}assets/branding/${filename}`)).toBe(true);
   });
 });
+
+describe("管理端功能入口", () => {
+  test("包含數據統計與分析頁籤", () => {
+    const html = readFileSync(`${projectPath}index.html`, "utf8");
+
+    expect(html).toContain('data-route="analytics"');
+    expect(html).toContain("數據統計與分析");
+  });
+});

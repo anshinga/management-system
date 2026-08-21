@@ -5,6 +5,7 @@ import {
   signOut,
   subscribeToAuthState,
 } from "./firebase/auth-service.js";
+import { createDailyRollCallReset } from "./daily-session.js";
 
 const authGate = document.querySelector("#auth-gate");
 const authTitle = document.querySelector("#auth-title");
@@ -82,7 +83,15 @@ async function startManagementSystem(user) {
       { renderBookingCampaigns, bindBookingCampaigns },
       { subscribeToWorkspaceData },
       { ensureWorkspaceAccess, promoteStudentGradesIfNeeded },
-      { formatDate, getSelectedAttendanceDate, getWeekStart, parseDate },
+      {
+        beginDailySession,
+        formatDate,
+        getSelectedAttendanceDate,
+        getTodayDate,
+        getWeekStart,
+        parseDate,
+        setSelectedAttendanceDate,
+      },
     ]) => {
       const app = document.querySelector("#app");
       const storageStatus = document.querySelector("#storage-status");
@@ -91,6 +100,15 @@ async function startManagementSystem(user) {
       let dataSubscription = null;
       let lastRenderedRevision = -1;
       let canManageBooking = false;
+      const validRoutes = new Set([
+        "roll-call",
+        "students",
+        "schedule",
+        "records",
+        "payment",
+        "export-backup",
+        "booking",
+      ]);
 
       function getCurrentDataScope() {
         if (currentRoute === "roll-call") {
@@ -157,12 +175,32 @@ async function startManagementSystem(user) {
         app.querySelector('[data-action="refresh"]')?.addEventListener("click", () => refresh(true));
       }
 
-      initRouter((route) => {
-        currentRoute = ["roll-call", "students", "schedule", "records", "payment", "export-backup", "booking"].includes(route)
-          ? route
-          : "roll-call";
+      function applyRoute(route) {
+        currentRoute = validRoutes.has(route) ? route : "roll-call";
+        document.querySelectorAll("[data-route]").forEach((button) => {
+          button.classList.toggle("is-active", button.dataset.route === currentRoute);
+        });
         refresh(true);
+      }
+
+      function replaceRouteHash(route) {
+        if (location.hash === `#${route}`) return;
+        window.history.replaceState(null, "", `#${route}`);
+      }
+
+      initRouter(applyRoute);
+      const returnToTodayIfNewDay = createDailyRollCallReset({
+        beginDailySession,
+        getTodayDate,
+        setSelectedAttendanceDate,
+        replaceRoute: replaceRouteHash,
+        applyRoute,
       });
+      returnToTodayIfNewDay();
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") returnToTodayIfNewDay();
+      });
+      window.addEventListener("pageshow", returnToTodayIfNewDay);
       document.querySelector("#theme-toggle").addEventListener("click", () => {
         document.body.classList.toggle("dark");
         localStorage.setItem("mpm-theme", document.body.classList.contains("dark") ? "dark" : "light");

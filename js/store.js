@@ -1,4 +1,14 @@
+import { APP_CONFIG } from "./config.js";
+
 const ATTENDANCE_DATE_KEY = "mpm-selected-attendance-date";
+const LAST_ACTIVE_DATE_KEY = "mpm-last-active-date";
+
+const businessDateFormatter = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_CONFIG.timezone,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
 
 function pad(number) {
   return String(number).padStart(2, "0");
@@ -49,8 +59,11 @@ export function getSchedule(state, date, slot, seasonId) {
     && item.slot === slot);
 }
 
-export function getTodayDate() {
-  return formatDate(new Date());
+export function getTodayDate(now = new Date()) {
+  const parts = Object.fromEntries(businessDateFormatter.formatToParts(now)
+    .filter(({ type }) => ["year", "month", "day"].includes(type))
+    .map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 function isDateKey(value) {
@@ -74,6 +87,13 @@ export function setSelectedAttendanceDate(date) {
   const selected = isDateKey(date) && date <= today ? date : today;
   localStorage.setItem(ATTENDANCE_DATE_KEY, selected);
   return selected;
+}
+
+export function beginDailySession(todayDate = getTodayDate()) {
+  const today = isDateKey(todayDate) ? todayDate : getTodayDate();
+  const lastActiveDate = localStorage.getItem(LAST_ACTIVE_DATE_KEY);
+  localStorage.setItem(LAST_ACTIVE_DATE_KEY, today);
+  return lastActiveDate !== today;
 }
 
 export function getWeekday(date = new Date()) {

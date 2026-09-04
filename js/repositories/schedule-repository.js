@@ -9,6 +9,7 @@ import { addDays, formatDate, getWeekStart, parseDate } from "../store.js";
 import {
   buildCarryForwardEntries,
   getSchedulePattern,
+  isScheduleEntryOverridden,
   makeScheduleEntryId,
   makeScheduleOverrideId,
 } from "../domain/schedule.js";
@@ -133,11 +134,13 @@ export async function moveScheduleEntry(studentId, source, target) {
   const sourceOverrideRef = sourceData && sourceData.temporary !== true
     ? overrideReference(sourceData)
     : null;
+  const targetOverrideRef = overrideReference(targetData);
   const futureOperations = await getFutureMoveOperations(studentId, sourceData, targetData);
   const references = [...new Map([
     targetRef,
     sourceRef,
     sourceOverrideRef,
+    targetOverrideRef,
     ...futureOperations.flatMap((operation) => [operation.sourceRef, operation.targetRef]),
   ]
     .filter(Boolean)
@@ -147,6 +150,17 @@ export async function moveScheduleEntry(studentId, source, target) {
     const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
     const snapshotByPath = new Map(snapshots.map((snapshot) => [snapshot.ref.path, snapshot]));
     const targetSnapshot = snapshotByPath.get(targetRef.path);
+    if (targetSnapshot.exists() && targetSnapshot.data().seasonId !== targetData.seasonId) {
+      throw new Error("這位學生在此日期與時段已有其他學期的排課，請先核對排課資料。");
+    }
+    // An explicit move/add restores a fixed target hidden by this week's
+    // override. Temporary targets still keep the fixed-pattern exclusion.
+    const targetIsFixed = targetSnapshot.exists()
+      ? targetSnapshot.data().temporary !== true
+      : targetData.temporary !== true;
+    if (targetIsFixed && snapshotByPath.get(targetOverrideRef.path)?.exists()) {
+      transaction.delete(targetOverrideRef);
+    }
 
     if (sourceRef && sourceRef.path !== targetRef.path) transaction.delete(sourceRef);
     if (!targetSnapshot.exists()) {
@@ -267,8 +281,7 @@ export async function moveScheduleEntryForDate(studentId, source, target) {
       : null;
     const restoresOverriddenTarget = sourceData.temporary === true
       && targetSnapshot?.exists()
-      && targetSnapshot.data().temporary !== true
-      && targetOverrideSnapshot?.exists();
+      && isScheduleEntryOverridden(targetSnapshot.data(), targetOverrideSnapshot?.data());
 
     if (!sourceSnapshot?.exists()) throw new Error("原本的排課已不存在，請重新整理後再試。");
     if (snapshotByPath.get(sourceAttendanceRef.path)?.exists()) {
@@ -319,13 +332,27 @@ async function addScheduleEntriesByType(studentIds, target, temporary) {
     temporary,
   }));
   const references = entries.map(entryReference);
+  const overrideRefs = entries.map(overrideReference);
 
   return runTransaction(db, async (transaction) => {
     const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
+    const overrideSnapshots = await Promise.all(overrideRefs.map((reference) => transaction.get(reference)));
+    // Validate the entire selection before staging any writes.
+    snapshots.forEach((snapshot, index) => {
+      if (snapshot.exists() && snapshot.data().seasonId !== entries[index].seasonId) {
+        throw new Error("選取的學生在此日期與時段已有其他學期的排課，請先核對排課資料。");
+      }
+    });
     let addedCount = 0;
     snapshots.forEach((snapshot, index) => {
-      if (snapshot.exists()) return;
+      const hiddenFixedEntry = snapshot.exists()
+        && isScheduleEntryOverridden(snapshot.data(), overrideSnapshots[index].data());
+      if (snapshot.exists() && !hiddenFixedEntry) return;
       addedCount += 1;
+      if (overrideSnapshots[index].exists() && (hiddenFixedEntry || !temporary)) {
+        transaction.delete(overrideRefs[index]);
+      }
+      if (snapshot.exists()) return;
       transaction.set(references[index], {
         ...entries[index],
         createdAt: serverTimestamp(),
@@ -378,10 +405,19 @@ export async function ensureScheduleWeek(date, seasonId, seasonRange = null) {
   if (!missingEntries.length) return false;
 
   const references = missingEntries.map(entryReference);
+  const overrideRefs = missingEntries.map(overrideReference);
+  let addedCount = 0;
   await runTransaction(db, async (transaction) => {
-    const snapshots = await Promise.all(references.map((reference) => transaction.get(reference)));
+    const [snapshots, overrideSnapshots] = await Promise.all([
+      Promise.all(references.map((reference) => transaction.get(reference))),
+      Promise.all(overrideRefs.map((reference) => transaction.get(reference))),
+    ]);
+    addedCount = 0;
     snapshots.forEach((snapshot, index) => {
-      if (snapshot.exists()) return;
+      // A manual exclusion may have been created after the initial queries.
+      // Never let automatic carry-forward recreate it with a newer timestamp.
+      if (snapshot.exists() || overrideSnapshots[index].exists()) return;
+      addedCount += 1;
       transaction.set(references[index], {
         ...missingEntries[index],
         createdAt: serverTimestamp(),
@@ -389,5 +425,5 @@ export async function ensureScheduleWeek(date, seasonId, seasonRange = null) {
       });
     });
   });
-  return true;
+  return addedCount > 0;
 }

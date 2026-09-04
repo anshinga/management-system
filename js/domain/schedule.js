@@ -145,16 +145,38 @@ export function buildCarryForwardEntries({
     .map(({ sourcePattern, ...entry }) => entry);
 }
 
+function scheduleTimestampMillis(value) {
+  let millis = Number.NaN;
+  if (typeof value?.toMillis === "function") millis = value.toMillis();
+  else if (typeof value?.seconds === "number") {
+    millis = value.seconds * 1000 + Number(value.nanoseconds || 0) / 1_000_000;
+  } else if (value instanceof Date) millis = value.getTime();
+  else if (typeof value === "string") millis = Date.parse(value);
+  return Number.isFinite(millis) ? millis : null;
+}
+
+// The caller supplies the override matching this entry's season/week/slot.
+// A newly recreated entry supersedes an older exclusion. Updating metadata
+// on an existing entry does not undo a later single-day schedule change.
+export function isScheduleEntryOverridden(entry, override) {
+  if (!override || entry.temporary === true) return false;
+  const createdAt = scheduleTimestampMillis(entry.createdAt);
+  const overriddenAt = scheduleTimestampMillis(override.updatedAt);
+  // Unknown or pending server timestamps retain the existing exclusion.
+  return createdAt === null || overriddenAt === null || createdAt <= overriddenAt;
+}
+
 export function groupScheduleEntries(entries = [], overrides = []) {
-  const overriddenEntries = new Set(overrides.map((override) => (
+  const overriddenEntries = new Map(overrides.map((override) => ([
     [
       override.seasonId,
       override.weekStart,
       override.studentId,
       override.sourceWeekday,
       override.sourceSlot,
-    ].join("\u0000")
-  )));
+    ].join("\u0000"),
+    override,
+  ])));
   const cells = new Map();
   entries.forEach((entry) => {
     if (!entry?.dateKey || !entry?.slot || !entry?.seasonId || !entry?.studentId) return;
@@ -167,7 +189,7 @@ export function groupScheduleEntries(entries = [], overrides = []) {
       weekday,
       entry.slot,
     ].join("\u0000");
-    if (entry.temporary !== true && overriddenEntries.has(overrideKey)) return;
+    if (isScheduleEntryOverridden(entry, overriddenEntries.get(overrideKey))) return;
     const key = `${entry.seasonId}\u0000${entry.dateKey}\u0000${entry.slot}`;
     if (!cells.has(key)) {
       cells.set(key, {

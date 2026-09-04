@@ -198,3 +198,61 @@ describe("schedule domain", () => {
     })).toThrow("時間");
   });
 });
+
+describe("排課重建後的舊例外", () => {
+  const timestamp = (iso) => ({ toMillis: () => Date.parse(iso) });
+  const entry = {
+    studentId: "s1", seasonId: "fall-2026", dateKey: "2026-09-02", slot: "15:00",
+    createdAt: timestamp("2026-08-26T07:24:16.795Z"),
+  };
+  const override = {
+    studentId: "s1", seasonId: "fall-2026", weekStart: "2026-08-31",
+    sourceWeekday: 3, sourceSlot: "15:00",
+    createdAt: timestamp("2026-08-26T07:23:58.189Z"),
+    updatedAt: timestamp("2026-08-26T07:23:58.189Z"),
+  };
+
+  test("9/2、9/9 的排課比舊例外晚建立時，應與 9/16 一樣正常顯示", () => {
+    const entries = [entry, {
+      ...entry, dateKey: "2026-09-09", createdAt: timestamp("2026-08-26T07:28:39.317Z"),
+    }, { ...entry, dateKey: "2026-09-16", createdAt: timestamp("2026-08-26T07:43:24.260Z") }];
+    const overrides = [override, {
+      ...override, weekStart: "2026-09-07",
+      createdAt: timestamp("2026-08-26T07:28:27.278Z"),
+      updatedAt: timestamp("2026-08-26T07:28:27.278Z"),
+    }];
+    expect(groupScheduleEntries(entries, overrides).map(cell => cell.date))
+      .toEqual(["2026-09-02", "2026-09-09", "2026-09-16"]);
+  });
+
+  test("重新排課後若再次單日調課，較晚的例外仍須隱藏原時段", () => {
+    expect(groupScheduleEntries([entry], [{
+      ...override, updatedAt: timestamp("2026-09-02T06:57:40.783Z"),
+    }])).toEqual([]);
+  });
+
+  test("一般更新不能使被調走的排課重新出現，判斷須用建立時間", () => {
+    expect(groupScheduleEntries([{
+      ...entry, createdAt: timestamp("2026-08-26T07:20:00.000Z"),
+      updatedAt: timestamp("2026-08-26T07:30:00.000Z"),
+    }], [override])).toEqual([]);
+  });
+
+  test("相同時間、未完成伺服器時間及不完整舊資料，維持例外有效", () => {
+    for (const createdAt of [override.updatedAt, null, undefined, "invalid"]) {
+      expect(groupScheduleEntries([{ ...entry, createdAt }], [override])).toEqual([]);
+    }
+    expect(groupScheduleEntries([entry], [{ ...override, updatedAt: null }])).toEqual([]);
+  });
+
+  test("可判讀序列化時間戳記，且不更動來源資料", () => {
+    const value = Date.parse("2026-08-26T07:24:16.795Z");
+    const original = {
+      ...entry, createdAt: { seconds: Math.floor(value / 1000), nanoseconds: (value % 1000) * 1e6 },
+    };
+    const exclusion = { ...override, createdAt: "2026-08-26T07:23:58.189Z", updatedAt: "2026-08-26T07:23:58.189Z" };
+    const before = JSON.stringify([original, exclusion]);
+    expect(groupScheduleEntries([original], [exclusion])[0]?.studentIds).toEqual(["s1"]);
+    expect(JSON.stringify([original, exclusion])).toBe(before);
+  });
+});

@@ -20,6 +20,26 @@ const summer = {
 };
 
 describe("export backup domain", () => {
+  test("匯出包含較晚重建的排課，並保留同日其他臨時時段", () => {
+    const state = {
+      students: [student("s1")],
+      seasons: [{ id: "fall-2026", name: "2026 上學期", startDate: "2026-09-01", endDate: "2027-01-31" }],
+      scheduleEntries: [
+        { studentId: "s1", seasonId: "fall-2026", dateKey: "2026-09-02", slot: "15:00", createdAt: "2026-08-26T07:24:16.795Z" },
+        { studentId: "s1", seasonId: "fall-2026", dateKey: "2026-09-02", slot: "16:30", temporary: true },
+      ],
+      scheduleOverrides: [{
+        studentId: "s1", seasonId: "fall-2026", weekStart: "2026-08-31", sourceWeekday: 3, sourceSlot: "15:00",
+        createdAt: "2026-08-26T07:23:58.189Z", updatedAt: "2026-08-26T07:23:58.189Z",
+      }],
+    };
+    const original = structuredClone(state);
+    const model = buildBackupExportModel(state, "2026-08-31");
+    expect(model.totalOccurrences).toBe(2);
+    expect(model.days[2].slots.find(({ slot }) => slot === "15:00").students.map(({ id }) => id)).toEqual(["s1"]);
+    expect(state).toEqual(original);
+  });
+
   test("預設選取目前週的下一週", () => {
     expect(formatDate(getDefaultBackupWeekStart(new Date(2026, 6, 29)))).toBe("2026-08-03");
   });

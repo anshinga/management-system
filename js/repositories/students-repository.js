@@ -33,10 +33,10 @@ function validateStudent(student) {
     throw new Error("沒有上一次上課日期時，不可保留歷史期數或堂數。");
   }
   if (!Number.isInteger(student.pendingPaymentCount) || student.pendingPaymentCount < 0) {
-    throw new Error("待付款期數不可小於 0。");
+    throw new Error("待寄收費單期數不可小於 0。");
   }
   if (student.paymentPending !== (student.pendingPaymentCount > 0)) {
-    throw new Error("待付款狀態與待付款期數不一致。");
+    throw new Error("收費單提醒狀態與待寄期數不一致。");
   }
 }
 

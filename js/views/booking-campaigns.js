@@ -165,7 +165,7 @@ function renderCampaignCard(state, campaign) {
 export function renderBookingCampaigns(state) {
   if (state.booking?.available === false) {
     return `<div class="page-head"><div><p class="eyebrow">家長時段登記</p><h2>選課活動</h2></div></div>
-      <section class="panel empty"><strong>選課功能尚未連上 Firebase</strong><p>原本的點名、學生、排課、紀錄與繳費功能仍可正常使用。請部署最新的 Firestore Rules 與 Cloud Functions 後重新整理頁面。</p></section>`;
+      <section class="panel empty"><strong>選課功能尚未連上 Firebase</strong><p>原本的點名、學生、排課、紀錄與收費單提醒功能仍可正常使用。請部署最新的 Firestore Rules 與 Cloud Functions 後重新整理頁面。</p></section>`;
   }
   const campaigns = [...state.bookingCampaigns].sort((a, b) => {
     const order = { open: 0, draft: 1, closed: 2 };

@@ -8,7 +8,7 @@ vi.mock("../js/repositories/payments-repository.js", () => ({
 const { renderPayment } = await import("../js/views/payment.js");
 
 describe("payment reminder view", () => {
-  test("只顯示繳費提醒與已繳費勾選，不顯示金額及付款歷史", () => {
+  test("只顯示收費單提醒與已寄送勾選，不顯示金額及付款歷史", () => {
     const html = renderPayment({
       students: [{
         id: "student-1",
@@ -25,16 +25,17 @@ describe("payment reminder view", () => {
       }],
     });
 
-    expect(html).toContain("繳費提醒");
+    expect(html).toContain("收費單提醒");
     expect(html).toContain("目前第 20 堂");
     expect(html).toContain('data-action="mark-payment-paid"');
-    expect(html).toContain("已繳費");
+    expect(html).toContain("已寄送收費單");
+    expect(html).not.toContain("已繳費");
     expect(html).not.toContain("付款歷史");
     expect(html).not.toContain("付款方式");
     expect(html).not.toContain("2000");
   });
 
-  test("目前期別已繳費後不再出現在提醒區", () => {
+  test("沿用 paid 狀態的已寄送或舊已繳費紀錄不再出現在提醒區", () => {
     const html = renderPayment({
       students: [{
         id: "student-1",
@@ -52,7 +53,7 @@ describe("payment reminder view", () => {
       payments: [],
     });
 
-    expect(html).toContain("目前沒有需要確認的繳費提醒");
+    expect(html).toContain("目前沒有待寄送的收費單");
     expect(html).not.toContain('data-action="mark-payment-paid"');
   });
 });

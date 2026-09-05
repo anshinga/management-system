@@ -8,6 +8,10 @@ import { makeBillingCycleId } from "../domain/attendance.js";
 import { PAYMENT_REMINDER_LESSON } from "../domain/payments.js";
 import { COLLECTIONS, workspaceDocumentRef } from "./firestore-paths.js";
 
+// Legacy names stay compatible with the existing Firestore Rules: pending means
+// a billing notice is due; new paid/paidAt writes confirm notice sending.
+// Older paid/paidAt records retain their original payment meaning and stay closed.
+
 export async function ensurePaymentReminders(students = [], billingCycles = []) {
   const user = auth.currentUser;
   if (!user?.uid) throw new Error("登入狀態已失效，請重新登入。");
@@ -21,7 +25,7 @@ export async function ensurePaymentReminders(students = [], billingCycles = []) 
     }))
     .filter((candidate) => !existingCycleIds.has(candidate.cycleId));
   if (!candidates.length) return 0;
-  if (candidates.length > 200) throw new Error("待補建的繳費提醒過多，請分批處理。");
+  if (candidates.length > 200) throw new Error("待補建的收費單提醒過多，請分批處理。");
 
   return runTransaction(db, async (transaction) => {
     const references = candidates.flatMap((candidate) => [
@@ -63,7 +67,7 @@ export async function markBillingCyclePaid(billingCycleId, { studentId, term }) 
   const user = auth.currentUser;
   if (!user?.uid) throw new Error("登入狀態已失效，請重新登入。");
   const expectedCycleId = makeBillingCycleId(studentId, term);
-  if (billingCycleId !== expectedCycleId) throw new Error("繳費提醒資料不正確。");
+  if (billingCycleId !== expectedCycleId) throw new Error("收費單提醒資料不正確。");
   const cycleRef = workspaceDocumentRef(COLLECTIONS.billingCycles, billingCycleId);
   const studentRef = workspaceDocumentRef(COLLECTIONS.students, studentId);
 
@@ -72,12 +76,12 @@ export async function markBillingCyclePaid(billingCycleId, { studentId, term }) 
       transaction.get(cycleRef),
       transaction.get(studentRef),
     ]);
-    if (!studentSnapshot.exists()) throw new Error("找不到付款學生。");
+    if (!studentSnapshot.exists()) throw new Error("找不到收費單對應的學生。");
     const student = studentSnapshot.data();
     if (!cycleSnapshot.exists()) {
       if (Number(student.currentTerm) !== Number(term)
         || Number(student.currentLessonCount) < PAYMENT_REMINDER_LESSON) {
-        throw new Error("找不到待繳費提醒。");
+        throw new Error("找不到待寄送的收費單提醒。");
       }
       transaction.set(cycleRef, {
         studentId,
@@ -93,9 +97,9 @@ export async function markBillingCyclePaid(billingCycleId, { studentId, term }) 
     }
     const cycle = cycleSnapshot.data();
     if (cycle.studentId !== studentId || Number(cycle.term) !== Number(term)) {
-      throw new Error("繳費提醒與學生資料不一致。");
+      throw new Error("收費單提醒與學生資料不一致。");
     }
-    if (cycle.status !== "pending") throw new Error("這一期已經標記為已繳費。");
+    if (cycle.status !== "pending") throw new Error("這一期的收費單提醒已解除。");
     const pendingPaymentCount = Math.max(0, Number(student.pendingPaymentCount || 0) - 1);
 
     transaction.update(cycleRef, {

@@ -187,7 +187,7 @@ export function renderRollCall(state, { now = new Date() } = {}) {
     <div class="stat-grid">
       <div class="stat"><div class="stat-label">當日課程人次</div><div class="stat-value">${scheduledPersonCount}</div><div class="stat-note">依選定日期排課</div></div>
       <div class="stat"><div class="stat-label">當日已到班</div><div class="stat-value">${present}</div><div class="stat-note">請假 ${leaveCount} 人次</div></div>
-      <div class="stat"><div class="stat-label">待繳費</div><div class="stat-value">${pending}</div><div class="stat-note">仍可正常點名</div></div>
+      <div class="stat"><div class="stat-label">待寄收費單</div><div class="stat-value">${pending}</div><div class="stat-note">仍可正常點名</div></div>
     </div>
     <div class="class-list">
       ${todaySchedules.length

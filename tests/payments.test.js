@@ -21,7 +21,7 @@ describe("payment reminders", () => {
     expect(needsPaymentReminder(student, [])).toBe(true);
   });
 
-  test("目前期別已繳費後解除提醒", () => {
+  test("目前期別已寄送或舊已繳費紀錄解除提醒", () => {
     const paidCycle = {
       id: "student-1__2",
       studentId: "student-1",
@@ -32,7 +32,7 @@ describe("payment reminders", () => {
     expect(getPaymentReminderItems([student], [paidCycle])).toEqual([]);
   });
 
-  test("過去期別仍待繳時持續提醒", () => {
+  test("過去期別仍待寄收費單時持續提醒", () => {
     const pendingCycle = {
       id: "student-1__1",
       studentId: "student-1",

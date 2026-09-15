@@ -181,6 +181,24 @@ describe("workspace data repository", () => {
     expect(states.at(-1).sync.ready).toBe(true);
   });
 
+  test("收費單頁會訂閱不可變更的繳費歷史", () => {
+    const states = [];
+    subscribeToWorkspaceData(
+      (state) => states.push(state),
+      vi.fn(),
+      { initialScope: { route: "payment" } },
+    );
+
+    expect([...snapshotHandlers.keys()].sort()).toEqual([
+      "billingCycles",
+      "payments",
+      "seasons",
+      "students",
+    ]);
+    resolveSnapshots(["students", "seasons", "billingCycles", "payments"]);
+    expect(states.at(-1).sync.ready).toBe(true);
+  });
+
   test("選課集合只在選課頁訂閱，權限錯誤不會阻斷核心資料", () => {
     const states = [];
     const fatalError = vi.fn();

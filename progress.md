@@ -1,5 +1,15 @@
 # 安信佳點名系統：專案進度與交接
 
+## 2026-09-15 收費單兩階段與繳費歷史
+
+- 分支：`codex/billing-two-stage`。收費流程改為 `pending`（待開單）→ `awaiting_payment`（待繳費）→ `paid`（已繳費）。
+- 開立收費單只記錄 `noticeSentAt` 並移到待繳費區，不減少 `pendingPaymentCount`，因此點名紅字與學生提醒會持續到真正確認繳費。
+- 確認繳費時以同一 Firestore transaction 建立不可修改的 `payments` 文件、結清 `billingCycles` 並更新學生提醒。新歷史保存學生 ID、姓名快照、期數、伺服器繳費時間與確認者，不含金額、方式或備註。
+- 收費單頁分為待開收費單、待繳費及繳費紀錄三區；只有 owner 可執行兩個確認動作，Rules 仍是最終權限邊界。
+- 舊 `paid` 週期維持結案，不全面遷移，也不自動產生新繳費歷史，避免混淆舊版 `paidAt` 的不同語意。
+- 驗證：收費相關 domain、repository、view、訂閱、點名、學生與點名交易共 7 檔 64 項測試通過；全套一般測試 27 檔中 26 檔、185 項中 184 項通過，唯一失敗是本次修改前已重現、依系統日期變動的排課 View 測試。所有修改的 JavaScript 通過 `node --check`，`git diff --check` 通過；桌面與 390px 手機預覽排版正常，Console 無 error／warn。
+- Firestore Rules Emulator 已嘗試執行，但本機缺少 Java 而無法啟動，因此新 Rules 的交易測試尚未實際跑過。本次部署必須先在有 Java 的環境通過 `npm.cmd run test:rules`，再發布 Rules，最後發布前端。
+
 ## 2026-09-05 收費單寄送提醒
 
 - 分支：`codex/billing-notice-reminder`。使用者確認以「已寄送收費單」取代「已繳費」；第 20 堂產生提醒，確認寄送後解除該期提醒，沒有其他待處理期別時同步解除點名姓名紅字。不新增付款追蹤或自動寄送功能。

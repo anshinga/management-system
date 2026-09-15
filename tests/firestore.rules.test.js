@@ -481,7 +481,7 @@ describe("Firestore Security Rules", () => {
     }));
   });
 
-  test("owner 必須在同一交易中解除待繳費提醒", async () => {
+  test("owner 開單後必須以付款交易建立歷史並解除紅字", async () => {
     const database = testEnvironment.authenticatedContext("owner-uid", {
       email: OWNER_EMAIL,
       email_verified: true,
@@ -505,18 +505,42 @@ describe("Firestore Security Rules", () => {
     });
     const cycle = workspaceDocument(database, "billingCycles", "student-1__1");
     const student = workspaceDocument(database, "students", "student-1");
+    const payment = workspaceDocument(database, "payments", "student-1__1");
     await assertFails(updateDoc(cycle, {
       status: "paid",
       paidAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     }));
+    await assertSucceeds(updateDoc(cycle, {
+      status: "awaiting_payment",
+      noticeSentAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
+    await assertFails(updateDoc(cycle, {
+      status: "paid",
+      paymentId: "student-1__1",
+      paidAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }));
     await assertSucceeds(runTransaction(database, async (transaction) => {
-      const [cycleSnapshot, studentSnapshot] = await Promise.all([
+      const [cycleSnapshot, studentSnapshot, paymentSnapshot] = await Promise.all([
         transaction.get(cycle),
         transaction.get(student),
+        transaction.get(payment),
       ]);
+      if (paymentSnapshot.exists()) throw new Error("unexpected payment fixture");
+      transaction.set(payment, {
+        billingCycleId: cycleSnapshot.id,
+        studentId: "student-1",
+        studentName: "測試學生",
+        term: 1,
+        paidAt: serverTimestamp(),
+        confirmedBy: "owner-uid",
+        createdAt: serverTimestamp(),
+      });
       transaction.update(cycle, {
         status: "paid",
+        paymentId: payment.id,
         paidAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });

@@ -5,12 +5,14 @@ import {
 import { auth } from "../firebase/auth.js";
 import { db } from "../firebase/firestore.js";
 import { makeBillingCycleId } from "../domain/attendance.js";
-import { PAYMENT_REMINDER_LESSON } from "../domain/payments.js";
+import {
+  BILLING_CYCLE_STATUSES,
+  PAYMENT_REMINDER_LESSON,
+} from "../domain/payments.js";
 import { COLLECTIONS, workspaceDocumentRef } from "./firestore-paths.js";
 
-// Legacy names stay compatible with the existing Firestore Rules: pending means
-// a billing notice is due; new paid/paidAt writes confirm notice sending.
-// Older paid/paidAt records retain their original payment meaning and stay closed.
+// Legacy paid cycles stay closed. New cycles move from notice pending, to payment
+// pending, then create an immutable payment document when payment is confirmed.
 
 export async function ensurePaymentReminders(students = [], billingCycles = []) {
   const user = auth.currentUser;
@@ -48,6 +50,7 @@ export async function ensurePaymentReminders(students = [], billingCycles = []) 
         status: "pending",
         paymentId: "",
         reminderAt: serverTimestamp(),
+        noticeSentAt: null,
         paidAt: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
@@ -63,11 +66,15 @@ export async function ensurePaymentReminders(students = [], billingCycles = []) 
   });
 }
 
-export async function markBillingCyclePaid(billingCycleId, { studentId, term }) {
-  const user = auth.currentUser;
-  if (!user?.uid) throw new Error("登入狀態已失效，請重新登入。");
+function validateCycleIdentity(billingCycleId, { studentId, term }) {
   const expectedCycleId = makeBillingCycleId(studentId, term);
   if (billingCycleId !== expectedCycleId) throw new Error("收費單提醒資料不正確。");
+}
+
+export async function markBillingNoticeSent(billingCycleId, { studentId, term }) {
+  const user = auth.currentUser;
+  if (!user?.uid) throw new Error("登入狀態已失效，請重新登入。");
+  validateCycleIdentity(billingCycleId, { studentId, term });
   const cycleRef = workspaceDocumentRef(COLLECTIONS.billingCycles, billingCycleId);
   const studentRef = workspaceDocumentRef(COLLECTIONS.students, studentId);
 
@@ -86,11 +93,18 @@ export async function markBillingCyclePaid(billingCycleId, { studentId, term }) 
       transaction.set(cycleRef, {
         studentId,
         term: Number(term),
-        status: "paid",
+        status: BILLING_CYCLE_STATUSES.paymentPending,
         paymentId: "",
         reminderAt: serverTimestamp(),
-        paidAt: serverTimestamp(),
+        noticeSentAt: serverTimestamp(),
+        paidAt: null,
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      const pendingPaymentCount = Number(student.pendingPaymentCount || 0) + 1;
+      transaction.update(studentRef, {
+        pendingPaymentCount,
+        paymentPending: true,
         updatedAt: serverTimestamp(),
       });
       return;
@@ -99,11 +113,57 @@ export async function markBillingCyclePaid(billingCycleId, { studentId, term }) 
     if (cycle.studentId !== studentId || Number(cycle.term) !== Number(term)) {
       throw new Error("收費單提醒與學生資料不一致。");
     }
-    if (cycle.status !== "pending") throw new Error("這一期的收費單提醒已解除。");
-    const pendingPaymentCount = Math.max(0, Number(student.pendingPaymentCount || 0) - 1);
+    if (cycle.status !== BILLING_CYCLE_STATUSES.noticePending) {
+      throw new Error("這一期的收費單已開立或已繳費。");
+    }
 
     transaction.update(cycleRef, {
-      status: "paid",
+      status: BILLING_CYCLE_STATUSES.paymentPending,
+      noticeSentAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
+export async function markBillingCyclePaid(billingCycleId, { studentId, term }) {
+  const user = auth.currentUser;
+  if (!user?.uid) throw new Error("登入狀態已失效，請重新登入。");
+  validateCycleIdentity(billingCycleId, { studentId, term });
+  const cycleRef = workspaceDocumentRef(COLLECTIONS.billingCycles, billingCycleId);
+  const studentRef = workspaceDocumentRef(COLLECTIONS.students, studentId);
+  const paymentRef = workspaceDocumentRef(COLLECTIONS.payments, billingCycleId);
+
+  await runTransaction(db, async (transaction) => {
+    const [cycleSnapshot, studentSnapshot, paymentSnapshot] = await Promise.all([
+      transaction.get(cycleRef),
+      transaction.get(studentRef),
+      transaction.get(paymentRef),
+    ]);
+    if (!cycleSnapshot.exists()) throw new Error("找不到待繳費資料。");
+    if (!studentSnapshot.exists()) throw new Error("找不到收費單對應的學生。");
+    if (paymentSnapshot.exists()) throw new Error("這一期已有繳費紀錄。");
+    const cycle = cycleSnapshot.data();
+    if (cycle.studentId !== studentId || Number(cycle.term) !== Number(term)) {
+      throw new Error("收費單提醒與學生資料不一致。");
+    }
+    if (cycle.status !== BILLING_CYCLE_STATUSES.paymentPending) {
+      throw new Error("這一期目前不是待繳費狀態。");
+    }
+    const student = studentSnapshot.data();
+    const pendingPaymentCount = Math.max(0, Number(student.pendingPaymentCount || 0) - 1);
+
+    transaction.set(paymentRef, {
+      billingCycleId,
+      studentId,
+      studentName: String(student.name || ""),
+      term: Number(term),
+      paidAt: serverTimestamp(),
+      confirmedBy: user.uid,
+      createdAt: serverTimestamp(),
+    });
+    transaction.update(cycleRef, {
+      status: BILLING_CYCLE_STATUSES.paid,
+      paymentId: billingCycleId,
       paidAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });

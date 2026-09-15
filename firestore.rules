@@ -411,24 +411,40 @@ service cloud.firestore {
 
     function validBillingCycle(data) {
       return data.keys().hasAll(["studentId", "term", "status", "paymentId", "paidAt", "createdAt", "updatedAt"])
-        && data.keys().hasOnly(["studentId", "term", "status", "paymentId", "reminderAt", "completedAt", "paidAt", "createdAt", "updatedAt"])
+        && data.keys().hasOnly(["studentId", "term", "status", "paymentId", "reminderAt", "completedAt", "noticeSentAt", "paidAt", "createdAt", "updatedAt"])
         && isSafeDocumentId(data.studentId)
         && data.term is int
         && data.term >= 1
-        && data.status in ["pending", "paid"]
+        && data.status in ["pending", "awaiting_payment", "paid"]
         && data.paymentId is string
         && (
           (data.keys().hasAny(["reminderAt"]) && data.reminderAt is timestamp)
           || (data.keys().hasAny(["completedAt"]) && data.completedAt is timestamp)
         )
+        && (
+          !data.keys().hasAny(["noticeSentAt"])
+          || data.noticeSentAt == null
+          || data.noticeSentAt is timestamp
+        )
         && (data.paidAt == null || data.paidAt is timestamp)
         && (
-          (data.status == "pending" && data.paymentId == "" && data.paidAt == null)
+          (
+            data.status == "pending"
+            && data.paymentId == ""
+            && data.paidAt == null
+            && (!data.keys().hasAny(["noticeSentAt"]) || data.noticeSentAt == null)
+          )
+          || (
+            data.status == "awaiting_payment"
+            && data.paymentId == ""
+            && data.noticeSentAt is timestamp
+            && data.paidAt == null
+          )
           || (data.status == "paid" && data.paidAt is timestamp)
         );
     }
 
-    function validPayment(data) {
+    function validLegacyPayment(data) {
       return data.keys().hasAll(["billingCycleId", "studentId", "term", "amount", "method", "paidDate", "note", "confirmedBy", "createdAt"])
         && data.keys().hasOnly(["billingCycleId", "studentId", "term", "amount", "method", "paidDate", "note", "confirmedBy", "createdAt"])
         && data.billingCycleId is string
@@ -446,6 +462,29 @@ service cloud.firestore {
         && data.confirmedBy.size() > 0
         && data.createdAt is timestamp
         && data.createdAt == request.time;
+    }
+
+    function validPaymentReceipt(data) {
+      return data.keys().hasAll(["billingCycleId", "studentId", "studentName", "term", "paidAt", "confirmedBy", "createdAt"])
+        && data.keys().hasOnly(["billingCycleId", "studentId", "studentName", "term", "paidAt", "confirmedBy", "createdAt"])
+        && data.billingCycleId is string
+        && data.billingCycleId.size() > 0
+        && isSafeDocumentId(data.studentId)
+        && data.studentName is string
+        && data.studentName.size() > 0
+        && data.studentName.size() <= 200
+        && data.term is int
+        && data.term >= 1
+        && data.paidAt is timestamp
+        && data.paidAt == request.time
+        && data.confirmedBy is string
+        && data.confirmedBy.size() > 0
+        && data.createdAt is timestamp
+        && data.createdAt == request.time;
+    }
+
+    function validPayment(data) {
+      return validLegacyPayment(data) || validPaymentReceipt(data);
     }
 
     match /workspaces/{workspaceId} {
@@ -667,10 +706,11 @@ service cloud.firestore {
                 && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending == true
               )
               || (
-                request.resource.data.status == "paid"
-                && request.resource.data.paidAt == request.time
-                && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data
-                  == get(studentPath(workspaceId, request.resource.data.studentId)).data
+                request.resource.data.status == "awaiting_payment"
+                && request.resource.data.noticeSentAt == request.time
+                && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
+                  == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount + 1
+                && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending == true
               )
             )
           )
@@ -692,27 +732,41 @@ service cloud.firestore {
         allow update: if isOwner(workspaceId)
           && billingCycleId == expectedBillingCycleId(request.resource.data)
           && validBillingCycle(request.resource.data)
-          && resource.data.status == "pending"
-          && request.resource.data.status == "paid"
           && request.resource.data.createdAt == resource.data.createdAt
           && request.resource.data.updatedAt == request.time
-          && request.resource.data.paidAt == request.time
-          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
-            == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount - 1
-          && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending
-            == (getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount > 0)
           && (
             (
-              request.resource.data.paymentId == resource.data.paymentId
+              resource.data.status == "pending"
+              && request.resource.data.status == "awaiting_payment"
+              && request.resource.data.paymentId == resource.data.paymentId
+              && request.resource.data.noticeSentAt == request.time
+              && request.resource.data.paidAt == null
               && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(["status", "paidAt", "updatedAt"])
+                .hasOnly(["status", "noticeSentAt", "updatedAt"])
+              && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data
+                == get(studentPath(workspaceId, request.resource.data.studentId)).data
             )
             || (
-              request.resource.data.diff(resource.data).affectedKeys()
+              resource.data.status == "awaiting_payment"
+              && request.resource.data.status == "paid"
+              && request.resource.data.noticeSentAt == resource.data.noticeSentAt
+              && request.resource.data.paidAt == request.time
+              && request.resource.data.diff(resource.data).affectedKeys()
                 .hasOnly(["status", "paymentId", "paidAt", "updatedAt"])
               && request.resource.data.paymentId.size() > 0
               && existsAfter(paymentPath(workspaceId, request.resource.data.paymentId))
               && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.billingCycleId == billingCycleId
+              && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.studentId
+                == request.resource.data.studentId
+              && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.term
+                == request.resource.data.term
+              && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.paidAt == request.time
+              && getAfter(paymentPath(workspaceId, request.resource.data.paymentId)).data.confirmedBy
+                == request.auth.uid
+              && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount
+                == get(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount - 1
+              && getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.paymentPending
+                == (getAfter(studentPath(workspaceId, request.resource.data.studentId)).data.pendingPaymentCount > 0)
             )
           );
         allow delete: if canTeach(workspaceId)
@@ -738,6 +792,11 @@ service cloud.firestore {
             == get(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.studentId
           && request.resource.data.term
             == get(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.term
+          && (
+            !request.resource.data.keys().hasAny(["studentName"])
+            || request.resource.data.studentName
+              == get(studentPath(workspaceId, request.resource.data.studentId)).data.name
+          )
           && getAfter(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.status == "paid"
           && getAfter(billingCyclePath(workspaceId, request.resource.data.billingCycleId)).data.paymentId == paymentId;
         allow update, delete: if false;

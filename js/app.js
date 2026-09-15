@@ -102,6 +102,7 @@ async function startManagementSystem(user) {
       let dataSubscription = null;
       let lastRenderedRevision = -1;
       let canManageBooking = false;
+      let canManagePayments = false;
       const validRoutes = new Set([
         "roll-call",
         "students",
@@ -166,7 +167,7 @@ async function startManagementSystem(user) {
                 : currentRoute === "records"
                   ? renderRecords(state)
                   : currentRoute === "payment"
-                    ? renderPayment(state)
+                    ? renderPayment(state, { canManage: canManagePayments })
                     : currentRoute === "export-backup"
                       ? renderExportBackup(state)
                       : renderBookingCampaigns(state);
@@ -223,6 +224,7 @@ async function startManagementSystem(user) {
           refresh(true);
           const member = await ensureWorkspaceAccess(authenticatedUser);
           canManageBooking = ["owner", "teacher"].includes(member.role);
+          canManagePayments = member.role === "owner";
           const bookingRouteButton = document.querySelector('[data-route="booking"]');
           if (bookingRouteButton) bookingRouteButton.hidden = !canManageBooking;
           if (!canManageBooking && currentRoute === "booking") {
@@ -262,6 +264,7 @@ async function startManagementSystem(user) {
           dataSubscription = null;
           state = null;
           lastRenderedRevision = -1;
+          canManagePayments = false;
           storageStatus.textContent = "尚未連線";
         },
       };

@@ -103,6 +103,7 @@ export async function markAttendance({ studentId, dateKey, slot, arrivalTime }) 
         status: "pending",
         paymentId: "",
         reminderAt: serverTimestamp(),
+        noticeSentAt: null,
         paidAt: null,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),

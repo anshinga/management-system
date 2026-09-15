@@ -10,7 +10,7 @@
 - `index.html` 透過 Firebase 官方 CDN import map 載入 Firebase Web SDK。
 - Google Authentication 負責登入；實際資料權限由 `workspaces/mpm-main/members` 與 Firestore Security Rules 共同決定。
 - `students`、`seasons`、`scheduleEntries`、`scheduleOverrides`、`attendance`、`leaveRecords`、`billingCycles`、`payments` 分開保存，介面透過 Firestore 即時監聽同步。
-- 完成第 20 堂時會在同一個 transaction 內建立收費單提醒；第 24 堂只推進學生期數。確認已寄送收費單後會解除該期提醒，不再要求輸入金額、方式或備註。
+- 完成第 20 堂時會在同一個 transaction 內建立收費單提醒；第 24 堂只推進學生期數。確認已開立收費單後移至待繳費，確認繳費後才解除提醒並保存繳費時間。
 - 若誤點的最新紀錄剛好是第 24 堂，可安全撤銷並自動恢復原期別第 23 堂；已有下一期點名時仍必須由最新紀錄開始依序撤銷。
 - 「數據統計與分析」進頁時不讀取歷史點名；只有按下分析按鈕後，才會一次性查詢最近 4、8 或 13 週的日期範圍。
 - 「匯出備份」會以唯讀方式從排課資料產生下一週紙本點名表，不會建立或修改 Firestore 文件。
@@ -81,16 +81,16 @@ GitHub Pages 仍照原本流程發布 `index.html`、`booking.html`、`css/` 與
 
 活動開放時會以當下既有排課計算可登記名額。為避免名額計數與實際排課不同，活動開放期間不要再人工增減該活動的日期與時段；如需調整，應先提前截止活動。
 
-## 收費單提醒
+## 收費單與繳費
 
-- 學生完成每一期第 20 堂後建立待寄收費單提醒。
-- 尚有待寄收費單的學生在今日點名頁以紅色姓名顯示。
-- 「收費單」頁只提供待寄名單與一次性的「已寄送收費單」確認；這是人工寄出後的標記，不會自動寄信或追蹤付款。
-- 確認後解除該期提醒；沒有其他待處理期別時，同步解除點名紅字與學生列表提醒。確認前可取消，確認後沿用既有不可自行取消的限制。
-- 為相容現有 Firestore Rules，保留 `status: "pending"`／`"paid"`、`paidAt`、`paymentPending` 與 `pendingPaymentCount` 等舊名稱；新操作的 `paidAt` 代表確認已寄送的時間。
-- 舊 `paid`／`paidAt` 紀錄仍代表原本的繳費確認，維持結案且不重新提醒；沒有新增欄位區分兩者，也不改寫歷史資料。後續若需付款或寄送歷史分析，不能直接把所有 `paidAt` 當成寄送日期。
-- 第 20 堂建立提醒、第 24 堂跨期與撤銷最新第 20 堂時撤回未處理提醒的交易維持不變；不需修改或部署 Firebase Rules、Indexes 或 Functions。
-- 舊有 `payments` 付款歷史保留但不再顯示或新增，避免破壞既有資料。
+- 學生完成每一期第 20 堂後建立「待開收費單」提醒。
+- 確認已開立後，`billingCycles.status` 由 `pending` 改為 `awaiting_payment`，並記錄 `noticeSentAt`；該期會移到待繳費區，但不解除學生紅字。
+- 確認已繳費後，在同一 transaction 內建立不可修改的 `payments` 歷史、把週期改為 `paid`，並在沒有其他未繳期別時解除點名紅字。
+- 新付款歷史保存學生 ID、當時姓名、期數、伺服器繳費時間及確認者；第一版不輸入金額、付款方式或備註。
+- 只有 owner 可以確認開單或繳費；其他有效成員只能讀取資料，實際權限由 Firestore Security Rules 控制。
+- 舊 `paid`／`paidAt` 週期保持結案，不改寫也不推導成新的 `payments` 紀錄，避免把舊版「已寄送」誤認成已繳費。
+- 第 20 堂建立提醒、第 24 堂跨期與撤銷最新且仍為 `pending` 的第 20 堂提醒交易維持不變。
+- 本功能修改 Firestore Rules，發布前必須先部署相容 Rules，再發布 GitHub Pages 前端。
 - 未來可由 LINE Bot 讀取待處理的 `billingCycles`；目前尚未實作 LINE 串接。
 
 ## 請假

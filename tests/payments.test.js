@@ -1,5 +1,7 @@
 import { describe, expect, test } from "vitest";
 import {
+  getAwaitingPaymentItems,
+  getBillingNoticeItems,
   getPaymentReminderItems,
   needsPaymentReminder,
   PAYMENT_REMINDER_LESSON,
@@ -46,8 +48,28 @@ describe("payment reminders", () => {
     )).toEqual([expect.objectContaining({
       id: "student-1__1",
       term: 1,
+      status: "pending",
       isDerived: false,
     })]);
+  });
+
+  test("開立收費單後仍維持提醒，並移到待繳費區", () => {
+    const awaitingCycle = {
+      id: "student-1__2",
+      studentId: "student-1",
+      term: 2,
+      status: "awaiting_payment",
+      noticeSentAt: new Date("2026-09-15T04:00:00Z"),
+    };
+
+    expect(needsPaymentReminder(student, [awaitingCycle])).toBe(true);
+    expect(getBillingNoticeItems([student], [awaitingCycle])).toEqual([]);
+    expect(getAwaitingPaymentItems([student], [awaitingCycle])).toEqual([
+      expect.objectContaining({
+        id: "student-1__2",
+        status: "awaiting_payment",
+      }),
+    ]);
   });
 
   test("舊資料已超過第 20 堂但尚無提醒時會建立相容提醒項目", () => {
@@ -55,7 +77,9 @@ describe("payment reminders", () => {
       id: "student-1__2",
       studentId: "student-1",
       term: 2,
+      status: "pending",
       reminderAt: null,
+      noticeSentAt: null,
       isDerived: true,
     }]);
   });

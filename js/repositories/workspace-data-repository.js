@@ -97,6 +97,13 @@ function routeSubscriptions(scope, includeBooking) {
     return [];
   }
 
+  if (scope.route === "payment") {
+    return [{
+      name: COLLECTIONS.payments,
+      reference: collectionQuery(COLLECTIONS.payments),
+    }];
+  }
+
   if (scope.route === "records") {
     return [{
       name: COLLECTIONS.attendance,
